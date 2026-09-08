@@ -30,7 +30,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.0.3'
+WERSJA = '1.0.4'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 
 # Domyslne ustawienia — uzytkownik zmienia je w oknie Ustawienia, zapisuja sie na dysk.
@@ -991,9 +991,9 @@ body{margin:0; background:var(--page); color:var(--txt);
 @media (max-width:900px){.kolumny{grid-template-columns:1fr; overflow-y:auto}}
 h1{font-size:29px; font-weight:590; margin:0; letter-spacing:-.03em;
   display:flex; align-items:center; gap:11px}
-.odsw{margin-left:auto; width:38px; height:38px; flex:none; border-radius:50%;
+.odsw{margin-left:auto; width:46px; height:46px; flex:none; border-radius:50%;
   border:1px solid var(--line); background:var(--field); color:var(--dim);
-  font-size:19px; line-height:1; cursor:pointer; padding:0; margin-top:0;
+  font-size:23px; line-height:1; cursor:pointer; padding:0; margin-top:0;
   box-shadow:none; backdrop-filter:blur(10px); transition:.2s;
   display:flex; align-items:center; justify-content:center}
 .odsw::before{display:none}
@@ -1115,7 +1115,7 @@ button.zielony{background:
 <div class="card">
   <h1><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAALsElEQVR4nO3d2Y8c1RXH8eqmQY7ZjbHEeBkQ8gMvCSASyX8Df0HeeODBWGYx+yYkCDGEBBswix/ywFv+gvwNIyUmCy88WAi8jSUvbAZjMFCoxuqZ7p7q7qq699x77j3fj9RRQqa7a5r6nTp36ZpekYny3d+WsY8BdvT2ftwrMpDkL/HLIcIOffoPp1cUkjhgAo8U9RMoCGoPkNAjJ32lxUDVQRF6WNBXVAxUHAjBh0V9BYUg6gH88g6TeUD/kXiFIMobE3xARyHoh35Dwg/oyUawivMz7T7Q2FWBuoEgHQDhB3RmRrTKEHxAdzcg9sI/v80MP+DLVY/KFAGRIQDhB9LIlPcCQPgBGRLZ8tZWEHwgvSGBlw6A8ANh+cqccwEg/EAcPrLn1Eb89BYz/UBsg8e6DweCbwUGoEfnAsDVH9DBJYudCgDhB3TpmsnWBYDwAzp1yWarAkD4Ad3aZnTQ6tW58z6QlcYdwE8HWfIDUtAmq43WDy8TfiA5V++bvz+AfQCAYXMLAFd/IE1NsjuzRbh8gHE/kLqrH58+FGAIABg2tQBw9QfyMCvLM/YBRP+rRQBidACXD/yOLT9ARqZlmjkAwLB1ff6Pb3L1B3J1zRP/H8s8HQBgGAUAMGysAND+A3mbzDgdAGAYBQAwbHVG8Me/MfsPWHHNk1dWA+gAAMNWtwKz9Q+whw4AsF4AfmD8D5gyzDwdAFBYnwNgAgAwiQ4AMIwCABjW++GvbAACrKIDAAwbMP8H2DVgBQCwiyEAYBgFADCMAgAYRgEADGMSEDCMDgAwjH0AgGF0AIBhFADAsBl/HhxtbXj6f1+n/KldeuPuG2MfA8Lqff/63XwdwNGGZ/6bdPAnXfrLPRQCIxgCOMot/Ln+TqhHAXCQc1By/t2whgLQkYWAWPgdraMAAIb1LjIJ2NpvjF0Zv2dSMFt8FwDzsU6ULYYAgGEUAMAwCgBgGAUAMIwCABjGKgDmYxUgW9wQBHOR/3wxBAAMowAAhlEAAMN63+3P84YgG5+ztV/foouvceMSV73v/pxPAdj4PKG36uJ+ioHZAkDwMUQhMDYHQPjB+WCwAyD4mIduYL5+lf7UHoQfTVTnSexztVT+6Ec/gpaPa5noQwsr54uC87ZQ+kh+DgBAd0kVgGtfYJkPnDcmCwDhB+eP4QIAwGgB4OoPziMZ3BAE+iz9sf6Pk+76h/v3O6rZb6S1DwCGTAv/vP+vodjncqns0bvwJ907Aa97kZn/Ubt23tYqBEtHT6fxrci24XboBr59lS8ODQ2Korf6P5B+4Oc9P5mCIIpzfmiw+t+QTeibvraaYtClta+e42NOwLgkVgGsqMIpGf7Y7+d9XO9hTsA6VgEUiB3C4fur6QikqZ71CosOwHj4tR4LwmAOIBKtYTPXDRhHBxCB1vCndowwsBEoNykFK6VjbSP2OV0qejAESDBQS7s3Nnu/wxe9HLPocKBayus6m88yoDNWARIJf9PQT3uOSzFQWQRcwp9ja9kRHYCC8C8dPf33muc82CX0UsVAvAggit43L9+juh5e/9J/vs41/HXBX+fNOx8shHQpBOJFYF4n4KHtv/DKvVnObXTBKoDm8Fee+LTZz3XQpcMQnxicFXDG/N7RAWgOv+VOQBAdwBo6gMA6hT9AJ+BzvgHp6JdlUWh+pCjV9fM2RSDV37ES+5wuFT3oADxLORiWigCuoAAAhlEAPMrlikgXYAcFILBqg0+nJwquAtRhUtAGtgIHthKsKsxtZvWnhP/+Dy/V/vg/H9hQ+DpWH98nUCfRyWUJbAWO1f43LQIT4Z8W+mk/46sYzMI24XQxBIjZVlfhntba1/x/TcI/qctzRjEUyBsdgIbJvznje9cQD58v2Q3QBaSJG4Io5xp+qddKWeybcJSKHgwBAkm5lU752DFbP3oJmvcwTOKKTReg4Jwu9TzoAJSSDCpFAEMUgAATgDm00E1+h1x2QlpCAQAMowAoFKJFZxiACgUAMGxQlvytdNjCOb+GDgAwjAIAGEYBAAyjAACGUQAUCvEd/hDvAf34LkAAOdxVJ4ffYZWCPfiFkgcdgKOU/0KOb3wW6aEAKCXZotP+Y4gbgihuoSWC2uU1s2r/43fdhaYHHQBgGAVAOZ9dAK0/JrEKEHDyq2srXQXXJbwuz296zElNAMbuu0s9DzqAhHQJMVd9zMJtwT2proBN7ohTXVFd7hA0GmjpvwyU5dUfYygAEbgWgSHR+/xnNvOPegwBItEcMM3HBr8GZTUZgKDDgJyk2P5zzq+hA4hI45VW4zFBDgUg8hVRU+DaHkuKV3+MYxJQwVBgGLxYfz+gSxEi/HmgAGS4OtD2PZ0d3JnUvMemzbGPoCi+OHdDoQEFQNmEYMgi0DX8K1f/xEKvzabN36goBoOVLYFQVwRWni9UCFyu+oRfphh8cTZOEeidf+5e1SVg0/6Pkp9o8rE06FoMfLT6S3uuc34NzBa6EDAESGR/wGiAmxYDnysMhD+MTbeG7QYGqi//GfG5SSj00iHhD18EzgcqAnQAAaW4U7D1mH/fUdHjSd7BnYUmbAQKLKX181bhr4JP+L19TrfcurZKIIlVgAhS6AQah5/QdzP83GZ0BFUROH9GdihABxAxYBq7gVbHRfjdRf4MKQCRaSoCrY6F8PsT8bMcFEUv2ptjPHixhgW1wWennwq3bKmGAXKnBR2A4WFB5/fj6u9fpM+UfQAKjYbSd1egaciBZiT36rAKoNxkYNsWBO+B5+ovp/ps61YFBCsAG4ESwxUcPlEA4M1dW2+u/eefnPqy1c83ee6015j385PP+aTBz0u9hgbqJwHPPXuf6g0zQMrUFwAAcigAgGH6/zhoWRTnnmEYAMNK/jgoAAF9BRf4Ro+zdAEwqhR8JDUHQBEA/EqqAAAwOAk4+jj7NBOCMKZkEnAMRQAwPgSoigCFADBaAIYoAoDhAlChGwC6yeqGIGdGJgi3vHGEG18gC6Xga2d7Q5AzT7Fa4GLLgrd/FXAlmNEshgAAuqEAAIZRAADDKACAYRQAwLBsVwGAbJRyL00HABiW1UYgIEel4GvTAQCGUQAAwygAgGGDouzFPgYAswhmlA4AMIwCABhGAQAMYx8AoBz7AACI4LsAgHZ8FwCABCYBAcMoAIBhFADAMCYBAe2YBAQggY1AgOGNQCtfM1p+7D5uDIQxt+34qv4T2XeUT0rSwZ3r/tHp4zeJvNXCW0d6TAIChlEAAMMGK//JAABtWlSGAcHa/xWsAgAQGwIsvH2E+4LB/UqFZD7TYeaZA0Ct08dkZp7RLvzS/x6uzAEwDYC2mAsIQnp6jg4A3TEUcP/8ZnyGywG6sLGx/6lH2BCEcQu3T9kQNImVAe/Fc/lzmQKw9Z21Ob/VIQAw7SRsVASGJzSFwEvXJBX+SRQA+MWwwFmo8K+bAxhtDYAYJ6R1y8Kf9WTGmQREIxSBPD9jCgBanaAUAhmxPtfalv/Uw6wGYLaFOxquDmCm5c/CBX/rofVD/NpJQL4bhHlOjZy4WykGTp9fTFMn/U7SBQDZ2FZz9Z+zDMiCAJC7qZOA2w79mwoAZGBWllkFAAybe5U/uff3zAkCidr27uxOvu/6AgB0apJdhgCAYY2v7icYCgDJ2N6wc+/7fkEAcbXJaruvAzMdCGSl1RzA9vfoAgDN2ma09SQgRQDQqUs2O60CUAQAXbpmsvMyIEUA0MEli+wDAAxzXto7sYetwkAs2993m5j3srZ/nCIABLfDMfzehgA+DgRA+Mx5Dy7dACDH98XW+yQg3QAgQyJbIqsAFAEgjUyJjt2PP8QKAeBqxwdyc2xBJu8oBICu4AfdCBTiFwFysiNQZoIH8xjDAmCqxcAXy37uvyCQisUI2YgaRroBoIh6UVRxNT62m9UC2LN4OH43HP0ARlEIYMGiguAPqTmQSRQD5GRRUehHqTyoSRQDpGhRaehHqT/AOhQEaLSYQOAnJXfA0xzb/QduWo5gFg//K4vs/Ao/lWvoUkduZwAAAABJRU5ErkJggg==" alt=""><span>DEPO<span class="g">SKAN</span></span>
     <button class="odsw" onclick="ustOtworz()" title="Ustawienia">&#9881;</button>
-    <button class="odsw" style="margin-left:8px" onclick="odswiez()" title="Odswiez">&#8635;</button></h1>
+    <button class="odsw" style="margin-left:10px" onclick="odswiez()" title="Odswiez">&#8635;</button></h1>
 
   <div class="kolumny">
     <!-- ── LEWA: wybor zdjec i sterowanie ─────────────────────────────── -->

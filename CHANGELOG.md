@@ -19,6 +19,14 @@ Nic w toku.
 
 ---
 
+## [1.0.4] — 2026-09-08
+
+### Zmienione
+
+- Przyciski ustawień i odświeżania w nagłówku powiększone o ok. 20% (38 → 46 px).
+
+---
+
 ## [1.0.3] — 2026-09-08
 
 ### Dodane
@@ -135,7 +143,8 @@ pliku źródłowego.
   do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
   zejść niżej.
 
-[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.3...HEAD
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.4
 [1.0.3]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.3
 [1.0.2]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.2
 [1.0.1]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.1
