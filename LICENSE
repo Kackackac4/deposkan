@@ -1,0 +1,67 @@
+OPROGRAMOWANIE WŁASNOŚCIOWE — WSZELKIE PRAWA ZASTRZEŻONE
+
+Copyright (c) 2026 MAKRO-PLAST Sp. z o.o.
+
+Niniejsze oprogramowanie ("DEPOSKAN") wraz z kodem źródłowym, dokumentacją
+i materiałami graficznymi stanowi własność MAKRO-PLAST Sp. z o.o. i jest
+przeznaczone wyłącznie do użytku wewnętrznego tej firmy oraz podmiotów przez
+nią wskazanych.
+
+Kod źródłowy jest udostępniony publicznie wyłącznie w celu umożliwienia
+pobierania wydań (Releases) oraz wglądu. Publiczna dostępność repozytorium
+NIE oznacza udzielenia jakiejkolwiek licencji.
+
+BEZ UPRZEDNIEJ PISEMNEJ ZGODY WŁAŚCICIELA ZABRANIA SIĘ:
+  - używania oprogramowania w całości lub w części,
+  - kopiowania, modyfikowania i tworzenia opracowań,
+  - rozpowszechniania, odsprzedaży, najmu i udostępniania osobom trzecim,
+  - wykorzystywania kodu lub jego fragmentów w innych projektach,
+    w tym w celu trenowania modeli uczenia maszynowego.
+
+Zezwala się wyłącznie na pobranie i uruchomienie gotowych wydań przez
+MAKRO-PLAST Sp. z o.o. i osoby przez nią upoważnione.
+
+OPROGRAMOWANIE DOSTARCZANE JEST "TAK JAK JEST", BEZ JAKICHKOLWIEK GWARANCJI,
+WYRAŹNYCH LUB DOROZUMIANYCH, W TYM GWARANCJI PRZYDATNOŚCI HANDLOWEJ
+I PRZYDATNOŚCI DO OKREŚLONEGO CELU. AUTOR ANI WŁAŚCICIEL NIE PONOSZĄ
+ODPOWIEDZIALNOŚCI ZA JAKIEKOLWIEK SZKODY WYNIKŁE Z UŻYCIA OPROGRAMOWANIA.
+
+Oprogramowanie korzysta z zewnętrznych bibliotek open source (m.in. OpenCV,
+NumPy, pywebview), które podlegają własnym licencjom ich twórców.
+
+Kontakt w sprawie licencji: k.makarewicz@makroplast.com
+
+---
+
+PROPRIETARY SOFTWARE — ALL RIGHTS RESERVED
+
+Copyright (c) 2026 MAKRO-PLAST Sp. z o.o.
+
+This software ("DEPOSKAN"), including its source code, documentation and
+graphic assets, is the property of MAKRO-PLAST Sp. z o.o. and is intended
+solely for internal use by that company and parties designated by it.
+
+The source code is made publicly visible only to enable downloading of
+Releases and for inspection. Public availability of this repository does
+NOT grant any license.
+
+WITHOUT PRIOR WRITTEN PERMISSION OF THE OWNER, YOU MAY NOT:
+  - use the software, in whole or in part,
+  - copy, modify or create derivative works,
+  - distribute, resell, rent or make available to third parties,
+  - incorporate the code or any part of it into other projects,
+    including for the purpose of training machine learning models.
+
+Permission is granted solely to download and run official releases by
+MAKRO-PLAST Sp. z o.o. and persons authorised by it.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE. IN NO EVENT SHALL THE AUTHOR OR OWNER BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE USE OF
+THE SOFTWARE.
+
+This software uses third-party open source libraries (including OpenCV,
+NumPy, pywebview) which are subject to their own licenses.
+
+Licensing enquiries: k.makarewicz@makroplast.com

@@ -14,6 +14,9 @@ Jak dziala:
 
 Uruchamianie: dwuklik w „Uruchom DEPOSKAN.command".
 
+Copyright (c) 2026 MAKRO-PLAST Sp. z o.o. — wszelkie prawa zastrzezone.
+Oprogramowanie wlasnosciowe, do uzytku wewnetrznego firmy. Patrz plik LICENSE.
+
 Uwaga o limitach: darmowy tier ma niski limit requestow na dobe, dlatego kadry
 leca paczkami (kilka obrazow w jednym requescie), a postep zapisuje sie na dysk —
 gdy limit sie skonczy, nastepnego dnia program dokonczy od miejsca przerwania.

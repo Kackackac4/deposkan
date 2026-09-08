@@ -39,3 +39,9 @@ Aplikacja sama sprawdza Releases przez „Sprawdź aktualizacje" w Ustawieniach.
 ## Jak to działa
 
 Opis algorytmu detekcji, zasady odczytu i pułapki: [DEPOSKAN.md](DEPOSKAN.md).
+
+## Licencja
+
+Oprogramowanie własnościowe — **wszelkie prawa zastrzeżone**,
+MAKRO-PLAST Sp. z o.o. Repozytorium jest publiczne wyłącznie po to, żeby dało się
+pobierać wydania; nie jest to projekt open source. Szczegóły: [LICENSE](LICENSE).
