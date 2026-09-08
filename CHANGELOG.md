@@ -19,6 +19,18 @@ Nic w toku.
 
 ---
 
+## [1.0.6] — 2026-09-08
+
+### Dodane
+
+- Stopka pod przyciskiem Skanuj: znak MAK i podpis
+  „Stworzono w Makro-Plast® przez Kacper Makarewicz | ver. X.Y.Z".
+  Numer wersji podstawia się sam.
+- Znak firmowy w wersji wektorowej (`MODULES/logo/mak.svg`) i rastrowej
+  (`MODULES/logo/mak.png`), obrysowany z oryginału — różnica 0,17% pikseli.
+
+---
+
 ## [1.0.5] — 2026-09-08
 
 ### Zmienione
@@ -158,7 +170,8 @@ pliku źródłowego.
   do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
   zejść niżej.
 
-[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.5...HEAD
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.6
 [1.0.5]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.5
 [1.0.4]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.4
 [1.0.3]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.3

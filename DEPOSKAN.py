@@ -30,7 +30,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.0.5'
+WERSJA = '1.0.6'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 
 # Domyslne ustawienia — uzytkownik zmienia je w oknie Ustawienia, zapisuja sie na dysk.
@@ -993,6 +993,10 @@ body{margin:0; background:var(--page); color:var(--txt);
 .dol{flex:none; margin-top:auto; padding-top:12px}
 .dol button{margin-top:8px}
 .dol .err:empty{display:none}
+.podpis{display:flex; align-items:center; gap:9px; margin-top:14px; padding-top:11px;
+  border-top:1px solid var(--line); font-size:10.5px; line-height:1.35; color:var(--dim)}
+.podpis .mak{width:38px; height:auto; flex:none; color:#CB2228}
+.podpis sup{font-size:.7em; vertical-align:super}
 .prawa{gap:0}
 .stopka{flex:none; margin-top:10px}
 .stopka button{margin-top:0}
@@ -1147,6 +1151,14 @@ button.zielony{background:
         <div class="err" id="err"></div>
         <button id="go" onclick="start()" disabled>Skanuj</button>
         <button id="stop" class="stop" onclick="stop()" style="display:none">Przerwij</button>
+
+        <div class="podpis">
+          <svg class="mak" viewBox="0 0 170 51" role="img" aria-label="MAK">
+            <path fill="currentColor" fill-rule="evenodd" d="M0.0,0.0 L0.0,50.92 L15.67,50.92 L15.92,49.58 L15.83,13.58 L16.42,12.92 L39.92,13.0 L42.25,13.25 L43.58,14.08 L45.0,15.67 L45.25,18.08 L45.25,48.33 L45.08,49.5 L45.42,50.92 L61.67,50.92 L61.92,49.75 L61.83,10.33 L60.67,5.75 L59.33,3.75 L57.58,2.08 L55.5,1.0 L53.42,0.75 L52.92,0.5 L52.67,0.0 Z M82.25,0.0 L82.33,1.08 L83.08,2.33 L83.17,3.42 L84.0,4.67 L84.17,5.83 L84.92,7.08 L85.17,8.42 L85.83,9.5 L86.08,10.75 L86.75,11.67 L87.0,13.25 L87.75,14.58 L87.83,15.42 L89.08,18.08 L89.08,18.58 L88.58,19.0 L75.67,18.92 L75.33,19.17 L74.25,21.75 L74.25,22.25 L73.42,24.67 L73.42,25.25 L72.75,26.75 L72.58,28.17 L71.83,29.67 L71.67,31.17 L71.0,32.42 L70.83,33.75 L70.17,35.0 L69.83,36.92 L69.08,38.33 L69.0,39.67 L68.25,40.92 L68.0,42.75 L67.5,43.67 L67.17,45.25 L66.5,46.75 L66.25,48.25 L65.58,49.58 L65.83,50.92 L117.92,50.92 L117.75,48.83 L117.0,47.33 L116.67,45.83 L116.08,45.0 L115.83,43.5 L115.08,42.25 L114.83,40.67 L114.0,39.33 L114.0,38.5 L113.33,37.33 L113.0,35.75 L112.33,34.42 L112.25,33.58 L111.75,32.58 L110.58,28.67 L109.92,27.58 L109.67,26.08 L108.92,24.75 L108.83,23.58 L108.0,22.33 L107.75,20.67 L107.17,19.83 L106.83,18.33 L106.17,17.17 L106.0,16.08 L105.25,14.5 L105.17,13.58 L104.42,12.17 L103.42,8.58 L102.83,7.5 L102.67,6.42 L101.92,5.0 L101.75,3.58 L100.92,2.42 L100.92,1.5 L100.33,0.0 Z M139.42,0.0 L139.33,0.58 L136.83,3.5 L133.25,7.17 L129.92,11.25 L126.0,15.33 L121.0,21.17 L120.75,21.75 L120.75,32.5 L121.25,33.42 L124.0,36.25 L128.25,41.17 L137.08,50.42 L137.17,50.92 L159.58,50.92 L159.5,50.25 L159.0,49.33 L157.58,48.08 L148.83,38.83 L135.67,25.58 L135.92,24.75 L138.92,21.67 L143.0,16.75 L146.17,13.5 L150.0,8.92 L157.08,1.25 L157.67,0.33 L157.67,0.0 Z M22.33,19.08 L21.92,19.58 L21.92,49.83 L22.17,50.92 L38.75,50.92 L39.0,49.42 L39.0,20.58 L38.83,19.42 L38.33,19.0 Z M90.17,24.0 L90.75,24.08 L91.08,24.5 L91.25,25.83 L92.83,29.0 L93.17,30.33 L93.92,31.42 L94.0,32.25 L94.83,33.58 L95.0,34.67 L95.67,35.75 L96.58,38.25 L97.25,39.25 L97.25,39.67 L96.75,40.08 L85.92,40.08 L85.33,39.67 L85.33,39.25 L85.83,38.42 L85.92,37.33 L86.67,36.0 L86.92,34.0 L87.67,32.5 L87.67,31.58 L89.08,27.33 L89.5,24.92 Z M163.83,0.0 L163.83,0.58 L163.0,1.08 L162.0,2.08 L161.75,2.92 L161.17,3.67 L161.17,4.58 L161.83,5.67 L162.0,6.58 L163.33,7.92 L164.42,8.08 L165.5,8.83 L166.17,8.83 L167.17,8.08 L168.25,7.75 L169.33,6.33 L169.92,6.25 L169.92,2.0 L169.42,1.92 L168.67,0.92 L168.17,0.75 L167.83,0.42 L167.83,0.0 Z M164.33,0.83 L166.75,0.83 L167.25,1.0 L167.75,1.75 L168.92,2.75 L169.08,3.17 L169.08,5.5 L168.92,5.92 L166.42,7.75 L165.17,7.58 L163.67,6.67 L162.0,4.58 L162.08,3.83 L162.67,3.25 L162.92,2.25 L163.75,1.67 L163.92,1.17 Z M164.5,2.25 L163.92,3.33 L164.08,5.75 L164.58,5.83 L165.5,4.92 L166.42,5.75 L166.83,5.67 L167.0,5.25 L166.75,4.25 L167.33,3.58 L167.17,3.08 L166.58,2.33 L166.17,2.17 Z"/>
+          </svg>
+          <span>Stworzono w Makro-Plast<sup>&reg;</sup> przez Kacper Makarewicz
+            &nbsp;|&nbsp; ver. <span id="wersjaStopka">—</span></span>
+        </div>
       </div>
     </div>
 
@@ -1285,6 +1297,7 @@ function ustWczytaj(pokazJesliBrak){
     $('uNaReq').value = U.na_req;
     $('uRpm').value   = U.rpm;
     $('wers').textContent = 'v' + U.wersja;
+    $('wersjaStopka').textContent = U.wersja;
     const sel = $('uModel');
     if (![...sel.options].some(o => o.value === U.model)){
       const o = document.createElement('option');
