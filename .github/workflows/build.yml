@@ -90,8 +90,14 @@ jobs:
           body: |
             ## Pobieranie
 
-            - **macOS** — `DEPOSKAN-macOS.zip`
-            - **Windows** — `DEPOSKAN.exe`
+            **macOS — zalecane, bez ostrzezen systemu.** Wklej w Terminal:
+
+            ```
+            curl -fsSL https://raw.githubusercontent.com/Kackackac4/deposkan/main/instaluj-mac.sh | bash
+            ```
+
+            **Windows** — `DEPOSKAN.exe` ponizej.
+            **macOS recznie** — `DEPOSKAN-macOS.zip` ponizej.
 
             Przy pierwszym uruchomieniu system pokaże ostrzeżenie, bo aplikacja nie ma
             certyfikatu — instrukcja zatwierdzenia jest w [README](../../#macos-blokuje-pierwsze-uruchomienie).

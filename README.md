@@ -18,23 +18,36 @@ Pobierz gotowy plik z [Releases](../../releases):
 - **macOS** — `DEPOSKAN-macOS.zip`, rozpakuj i przenieś `DEPOSKAN.app` do Programów
 - **Windows** — `DEPOSKAN.exe`
 
-### macOS blokuje pierwsze uruchomienie
+### macOS — instalacja jedną komendą (zalecane)
 
-Aplikacja nie jest podpisana certyfikatem Apple, więc przy pierwszym otwarciu system
-pokaże ostrzeżenie. To normalne — trzeba raz zatwierdzić:
-
-1. Rozpakuj ZIP i przenieś `DEPOSKAN.app` do folderu **Programy**.
-2. Kliknij dwukrotnie — pojawi się ostrzeżenie. Zamknij je.
-3. Otwórz **Ustawienia systemowe → Prywatność i ochrona**, przewiń na dół.
-4. Przy komunikacie o zablokowanym DEPOSKAN kliknij **„Otwórz mimo to"**.
-
-Robi się to **tylko raz**. Kolejne uruchomienia działają normalnie.
-
-Kto woli terminal, jedna komenda załatwia sprawę przed pierwszym uruchomieniem:
+Wklej w **Terminal**:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/DEPOSKAN.app
+curl -fsSL https://raw.githubusercontent.com/Kackackac4/deposkan/main/instaluj-mac.sh | bash
 ```
+
+Pobierze najnowszą wersję, wgra do folderu Programy i uruchomi — **bez żadnych
+ostrzeżeń systemu**.
+
+Dlaczego to działa, a pobranie przez przeglądarkę nie: ostrzeżenie „nie można otworzyć,
+bo pochodzi od niezidentyfikowanego dewelopera" bierze się z etykiety kwarantanny,
+którą **nakłada przeglądarka** przy pobieraniu. Plik pobrany z Terminala jej nie
+dostaje. To ten sam mechanizm, z którego korzysta Homebrew i większość narzędzi
+instalowanych komendą.
+
+Ta sama komenda **aktualizuje** aplikację do najnowszej wersji.
+
+### macOS — pobranie przez przeglądarkę
+
+Jeśli wolisz pobrać ZIP ręcznie z Releases, system zablokuje pierwsze uruchomienie
+i trzeba je raz zatwierdzić:
+
+1. Rozpakuj i przenieś `DEPOSKAN.app` do folderu **Programy**.
+2. Kliknij dwukrotnie — pojawi się ostrzeżenie. Zamknij je.
+3. **Ustawienia systemowe → Prywatność i ochrona**, przewiń na dół.
+4. Przy komunikacie o zablokowanym DEPOSKAN kliknij **„Otwórz mimo to"**.
+
+Robi się to tylko raz.
 
 ### Windows blokuje pierwsze uruchomienie
 
