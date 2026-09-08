@@ -50,6 +50,16 @@ jobs:
           # ostrzezenia o niezweryfikowanym tworcy
           cd dist && ditto -c -k --sequesterRsrc --keepParent DEPOSKAN.app DEPOSKAN-macOS.zip
 
+      - name: Sprawdz skladnie instalatora Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $bledy = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "$PWD/instaluj-win.ps1", [ref]$null, [ref]$bledy) | Out-Null
+          if ($bledy.Count) { $bledy | ForEach-Object { Write-Error $_.Message }; exit 1 }
+          Write-Host "instaluj-win.ps1 — skladnia poprawna"
+
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |

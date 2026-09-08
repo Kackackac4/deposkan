@@ -49,10 +49,29 @@ i trzeba je raz zatwierdzić:
 
 Robi się to tylko raz.
 
-### Windows blokuje pierwsze uruchomienie
+### Windows — instalacja jedną komendą (zalecane)
 
-To samo z innej strony: SmartScreen pokaże „Windows chronił Twój komputer".
-Kliknij **Więcej informacji → Uruchom mimo to**. Też tylko za pierwszym razem.
+Otwórz **PowerShell** i wklej:
+
+```powershell
+irm https://raw.githubusercontent.com/Kackackac4/deposkan/main/instaluj-win.ps1 | iex
+```
+
+Pobierze najnowszą wersję, zainstaluje w folderze użytkownika, utworzy skróty
+w Menu Start i na pulpicie, po czym uruchomi aplikację.
+
+Działa z tego samego powodu co na macOS: ostrzeżenie SmartScreen bierze się
+z etykiety „Mark of the Web", którą nakłada przeglądarka przy pobieraniu.
+Plik pobrany przez PowerShell jej nie dostaje.
+
+Ta sama komenda **aktualizuje** aplikację.
+
+### Windows — pobranie przez przeglądarkę
+
+Po pobraniu `DEPOSKAN.exe` z Releases SmartScreen pokaże „Windows chronił Twój
+komputer". Kliknij **Więcej informacji → Uruchom mimo to**. Tylko za pierwszym razem.
+
+Antywirus może zgłosić fałszywy alarm — patrz [Czy to bezpieczne](#czy-to-bezpieczne).
 
 ---
 
