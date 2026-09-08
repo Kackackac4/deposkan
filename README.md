@@ -13,6 +13,31 @@ Pobierz gotowy plik z [Releases](../../releases):
 - **macOS** — `DEPOSKAN-macOS.zip`, rozpakuj i przenieś `DEPOSKAN.app` do Programów
 - **Windows** — `DEPOSKAN.exe`
 
+### macOS blokuje pierwsze uruchomienie
+
+Aplikacja nie jest podpisana certyfikatem Apple, więc przy pierwszym otwarciu system
+pokaże ostrzeżenie. To normalne — trzeba raz zatwierdzić:
+
+1. Rozpakuj ZIP i przenieś `DEPOSKAN.app` do folderu **Programy**.
+2. Kliknij dwukrotnie — pojawi się ostrzeżenie. Zamknij je.
+3. Otwórz **Ustawienia systemowe → Prywatność i ochrona**, przewiń na dół.
+4. Przy komunikacie o zablokowanym DEPOSKAN kliknij **„Otwórz mimo to"**.
+
+Robi się to **tylko raz**. Kolejne uruchomienia działają normalnie.
+
+Kto woli terminal, jedna komenda załatwia sprawę przed pierwszym uruchomieniem:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/DEPOSKAN.app
+```
+
+### Windows blokuje pierwsze uruchomienie
+
+To samo z innej strony: SmartScreen pokaże „Windows chronił Twój komputer".
+Kliknij **Więcej informacji → Uruchom mimo to**. Też tylko za pierwszym razem.
+
+---
+
 Przy pierwszym starcie aplikacja poprosi o klucz API z
 [Google AI Studio](https://aistudio.google.com/apikey). Klucz zapisuje się lokalnie
 i **nie ma go w kodzie**.
