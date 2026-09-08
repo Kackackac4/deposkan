@@ -19,6 +19,23 @@ Nic w toku.
 
 ---
 
+## [1.0.9] — 2026-09-08
+
+### Poprawione
+
+- **Poświata przycisku „Skanuj" nie jest już ucinana po bokach.** Kolumny przycinały
+  wszystko, co wystaje poza ich obrys, a cień przycisku sięga 28 px. Teraz przewijanie
+  siedzi wyłącznie na liście plików i na logu, więc nic nie obcina cieni.
+
+### Zmienione
+
+- Przyciski „Skanuj" i „Pokaż wyniki w Finderze" stoją równo, na jednej wysokości
+  u dołu obu kolumn.
+- Podpis ze znakiem MAK przeniesiony do stopki na całej szerokości okna, pod obiema
+  kolumnami, i wyśrodkowany.
+
+---
+
 ## [1.0.8] — 2026-09-08
 
 ### Poprawione
@@ -198,7 +215,8 @@ pliku źródłowego.
   do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
   zejść niżej.
 
-[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.8...HEAD
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.9...HEAD
+[1.0.9]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.9
 [1.0.8]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.8
 [1.0.7]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.7
 [1.0.6]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.6
