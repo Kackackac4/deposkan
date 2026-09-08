@@ -19,6 +19,23 @@ Nic w toku.
 
 ---
 
+## [1.0.7] — 2026-09-08
+
+### Zmienione
+
+- **Aktualizacja pokazuje pasek postępu na żywo.** Wcześniej po kliknięciu przycisku
+  okno stało bez znaku życia aż do końca pobierania — nie było wiadomo, czy działa,
+  czy się zawiesiło. Teraz widać etap (pobieram → sprawdzam sumę kontrolną →
+  podmieniam → uruchamiam ponownie), procent i megabajty (`38,4 / 62,1 MB`).
+- Aktualizacja pracuje w osobnym wątku; wcześniej blokowała serwer na cały czas
+  pobierania, więc interfejs nie miał jak zapytać o postęp.
+- Błąd aktualizacji pokazuje się w oknie razem z przyciskiem „Spróbuj ponownie"
+  zamiast pozostawiać zablokowany przycisk.
+- Zanik połączenia w trakcie podmiany nie jest już mylony z awarią — to normalny
+  moment, w którym aplikacja się zamyka przed restartem.
+
+---
+
 ## [1.0.6] — 2026-09-08
 
 ### Dodane
@@ -170,7 +187,8 @@ pliku źródłowego.
   do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
   zejść niżej.
 
-[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.6...HEAD
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.7
 [1.0.6]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.6
 [1.0.5]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.5
 [1.0.4]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.4

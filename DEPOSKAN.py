@@ -30,7 +30,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.0.6'
+WERSJA = '1.0.7'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 
 # Domyslne ustawienia — uzytkownik zmienia je w oknie Ustawienia, zapisuja sie na dysk.
@@ -329,6 +329,15 @@ def sprawdz_aktualizacje():
             'link': link, 'opis': (d.get('body') or '')[:300]}
 
 
+AKT = {'trwa': False, 'etap': '', 'procent': 0, 'mb': 0.0, 'mb_calosc': 0.0,
+       'blad': '', 'gotowe': False, 'wersja': ''}
+
+
+def akt_stan(**co):
+    with BLOKADA:
+        AKT.update(co)
+
+
 def sciezka_aplikacji():
     """Gdzie leży zainstalowana aplikacja. None, gdy chodzimy ze zrodel."""
     if not getattr(sys, 'frozen', False):
@@ -348,14 +357,15 @@ def pobierz_z_kontrola(url, cel, suma_url=None, nazwa=None):
             url, headers={'User-Agent': 'deposkan'}), timeout=300) as r, open(cel, 'wb') as f:
         calosc = int(r.headers.get('Content-Length') or 0)
         mam = 0
+        akt_stan(etap='pobieram', mb_calosc=round(calosc / 1048576, 1))
         while True:
             kawalek = r.read(262144)
             if not kawalek:
                 break
             f.write(kawalek)
             mam += len(kawalek)
-            if calosc:
-                faza(f'pobieram aktualizacje… {100*mam//calosc}%')
+            akt_stan(mb=round(mam / 1048576, 1),
+                     procent=(100 * mam // calosc) if calosc else 0)
 
     if not (suma_url and nazwa):
         return True
@@ -366,6 +376,7 @@ def pobierz_z_kontrola(url, cel, suma_url=None, nazwa=None):
     except Exception:
         return True                       # brak pliku sum — nie blokujemy aktualizacji
     import hashlib
+    akt_stan(etap='sprawdzam sume kontrolna', procent=100)
     oczekiwana = None
     for linia in sumy.splitlines():
         czesci = linia.split()
@@ -380,6 +391,19 @@ def pobierz_z_kontrola(url, cel, suma_url=None, nazwa=None):
     return h.hexdigest() == oczekiwana
 
 
+def zaktualizuj_w_tle():
+    """Cala aktualizacja w osobnym watku — interfejs odpytuje o postep."""
+    try:
+        w = zaktualizuj()
+        if w.get('ok'):
+            akt_stan(etap='uruchamiam ponownie', gotowe=True, wersja=w['wersja'], trwa=False)
+            threading.Timer(1.5, lambda: os._exit(0)).start()
+        else:
+            akt_stan(etap='', blad=w.get('info', 'nie udalo sie'), trwa=False)
+    except Exception as e:
+        akt_stan(etap='', blad=f'{type(e).__name__}: {e}', trwa=False)
+
+
 def zaktualizuj():
     """Pobiera nowe wydanie i podmienia zainstalowana aplikacje w miejscu."""
     cel = sciezka_aplikacji()
@@ -392,7 +416,6 @@ def zaktualizuj():
     if not a.get('nowsza'):
         return {'ok': False, 'info': 'masz juz najnowsza wersje'}
 
-    faza('pobieram aktualizacje…')
     tmp = tempfile.mkdtemp(prefix='deposkan-akt-')
     nazwa = os.path.basename(a['link'].split('?')[0])
     paczka = os.path.join(tmp, nazwa)
@@ -401,7 +424,7 @@ def zaktualizuj():
         shutil.rmtree(tmp, ignore_errors=True)
         raise RuntimeError('suma kontrolna pobranego pliku sie nie zgadza')
 
-    faza('przygotowuje podmiane…')
+    akt_stan(etap='podmieniam aplikacje', procent=100)
     if sys.platform == 'darwin':
         skrypt = os.path.join(tmp, 'podmien.sh')
         open(skrypt, 'w').write(f"""#!/bin/bash
@@ -894,10 +917,15 @@ class H(http.server.BaseHTTPRequestHandler):
         if path == '/api/aktualizacja':
             return sprawdz_aktualizacje()
         if path == '/api/zaktualizuj':
-            w = zaktualizuj()
-            if w.get('ok'):
-                threading.Timer(1.2, lambda: os._exit(0)).start()   # helper czeka na zamkniecie
-            return w
+            if AKT['trwa']:
+                return {'ok': True, 'juz': True}
+            akt_stan(trwa=True, etap='sprawdzam wydanie', procent=0, mb=0,
+                     mb_calosc=0, blad='', gotowe=False, wersja='')
+            threading.Thread(target=zaktualizuj_w_tle, daemon=True).start()
+            return {'ok': True}
+        if path == '/api/stan_akt':
+            with BLOKADA:
+                return dict(AKT)
         if path == '/api/reset':
             if STAN['pracuje']:
                 return {'error': 'najpierw przerwij prace'}
@@ -1098,6 +1126,8 @@ button.ghost::before{display:none}
   backdrop-filter:blur(40px) saturate(180%);
   box-shadow:0 28px 70px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.4)}
 .aktTxt{font-size:14.5px; line-height:1.55; color:var(--dim); margin-bottom:18px}
+.aktInfo{display:flex; justify-content:space-between; font-size:12px; color:var(--dim);
+  margin-top:7px; margin-bottom:16px; font-variant-numeric:tabular-nums}
 .aktTxt b{color:var(--txt)}
 button.zielony{background:
   linear-gradient(180deg,rgba(255,255,255,.36),rgba(255,255,255,.08) 46%,rgba(255,255,255,0) 62%),
@@ -1185,6 +1215,10 @@ button.zielony{background:
   <div class="modalKarta" style="max-width:430px; text-align:center">
     <div class="modalTyt" style="justify-content:center">Nowa wersja</div>
     <div class="aktTxt" id="aktTxt"></div>
+    <div id="aktPasek" style="display:none">
+      <div class="bar"><div class="fill" id="aktFill"></div></div>
+      <div class="aktInfo"><span id="aktEtap"></span><span id="aktMb"></span></div>
+    </div>
     <button class="zielony" id="aktPobierz">Zaktualizuj i uruchom ponownie</button>
     <button class="ghost" id="aktPozniej"
             onclick="$('modalAkt').classList.remove('on')">Pozniej</button>
@@ -1340,22 +1374,49 @@ function aktStart(){
 function zaktualizuj(a){
   const b = $('aktPobierz');
   b.disabled = true; $('aktPozniej').disabled = true;
-  b.textContent = 'Pobieram…';
-  $('aktTxt').innerHTML = 'Trwa pobieranie wersji <b>' + a.najnowsza +
+  b.textContent = 'Aktualizuje…';
+  $('aktTxt').innerHTML = 'Pobieram wersje <b>' + a.najnowsza +
     '</b>. Aplikacja zamknie sie i otworzy ponownie sama.';
+  $('aktPasek').style.display = 'block';
   post('/api/zaktualizuj').then(w => {
-    if (w.error || !w.ok){
-      b.disabled = false; $('aktPozniej').disabled = false;
-      b.textContent = 'Zaktualizuj i uruchom ponownie';
-      $('aktTxt').textContent = w.error || w.info || 'nie udalo sie zaktualizowac';
-      return;
-    }
-    b.textContent = 'Podmieniam…';
-    $('aktTxt').innerHTML = 'Za chwile aplikacja uruchomi sie w wersji <b>' +
-      w.wersja + '</b>.';
-  }).catch(() => {   // serwer znika w trakcie podmiany — to normalne
-    b.textContent = 'Podmieniam…';
-  });
+    if (w.error){ aktBlad(w.error); return; }
+    sledzAkt();
+  }).catch(() => sledzAkt());
+}
+
+function aktBlad(txt){
+  $('aktPobierz').disabled = false; $('aktPozniej').disabled = false;
+  $('aktPobierz').textContent = 'Sprobuj ponownie';
+  $('aktPasek').style.display = 'none';
+  $('aktTxt').textContent = txt;
+}
+
+// Odpytujemy serwer o postep. Gdy przestaje odpowiadac, a byl juz etap podmiany,
+// to znaczy ze aplikacja wlasnie sie zamyka — czekamy, az wstanie nowa.
+function sledzAkt(){
+  let podmieniano = false;
+  const tik = setInterval(() => {
+    post('/api/stan_akt').then(A => {
+      if (A.blad){ clearInterval(tik); aktBlad(A.blad); return; }
+      if (A.etap === 'podmieniam aplikacje' || A.gotowe) podmieniano = true;
+      $('aktFill').style.width = (A.procent || 0) + '%';
+      $('aktEtap').textContent = A.etap || '';
+      $('aktMb').textContent = A.mb_calosc
+        ? A.mb.toFixed(1) + ' / ' + A.mb_calosc.toFixed(1) + ' MB' : '';
+      if (A.gotowe){
+        clearInterval(tik);
+        $('aktEtap').textContent = 'uruchamiam ponownie…';
+        $('aktTxt').innerHTML = 'Gotowe. Aplikacja startuje w wersji <b>' +
+          A.wersja + '</b>.';
+      }
+    }).catch(() => {
+      if (podmieniano){    // serwer zniknal w trakcie podmiany — to normalne
+        clearInterval(tik);
+        $('aktEtap').textContent = 'uruchamiam ponownie…';
+        $('aktFill').style.width = '100%';
+      }
+    });
+  }, 400);
 }
 
 function akt(){
