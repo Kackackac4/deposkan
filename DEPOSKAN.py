@@ -30,7 +30,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.0.7'
+WERSJA = '1.0.8'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 
 # Domyslne ustawienia — uzytkownik zmienia je w oknie Ustawienia, zapisuja sie na dysk.
@@ -376,7 +376,7 @@ def pobierz_z_kontrola(url, cel, suma_url=None, nazwa=None):
     except Exception:
         return True                       # brak pliku sum — nie blokujemy aktualizacji
     import hashlib
-    akt_stan(etap='sprawdzam sume kontrolna', procent=100)
+    akt_stan(etap='sprawdzam sumę kontrolną', procent=100)
     oczekiwana = None
     for linia in sumy.splitlines():
         czesci = linia.split()
@@ -399,7 +399,7 @@ def zaktualizuj_w_tle():
             akt_stan(etap='uruchamiam ponownie', gotowe=True, wersja=w['wersja'], trwa=False)
             threading.Timer(1.5, lambda: os._exit(0)).start()
         else:
-            akt_stan(etap='', blad=w.get('info', 'nie udalo sie'), trwa=False)
+            akt_stan(etap='', blad=w.get('info', 'nie udało się'), trwa=False)
     except Exception as e:
         akt_stan(etap='', blad=f'{type(e).__name__}: {e}', trwa=False)
 
@@ -408,13 +408,13 @@ def zaktualizuj():
     """Pobiera nowe wydanie i podmienia zainstalowana aplikacje w miejscu."""
     cel = sciezka_aplikacji()
     if not cel:
-        raise RuntimeError('aktualizacja dziala tylko w zainstalowanej aplikacji')
+        raise RuntimeError('aktualizacja działa tylko w zainstalowanej aplikacji')
 
     a = sprawdz_aktualizacje()
     if a.get('blad'):
         raise RuntimeError(a['blad'])
     if not a.get('nowsza'):
-        return {'ok': False, 'info': 'masz juz najnowsza wersje'}
+        return {'ok': False, 'info': 'masz już najnowszą wersję'}
 
     tmp = tempfile.mkdtemp(prefix='deposkan-akt-')
     nazwa = os.path.basename(a['link'].split('?')[0])
@@ -422,9 +422,9 @@ def zaktualizuj():
     sumy = f"https://github.com/{REPO}/releases/download/v{a['najnowsza']}/checksums.txt"
     if not pobierz_z_kontrola(a['link'], paczka, sumy, nazwa):
         shutil.rmtree(tmp, ignore_errors=True)
-        raise RuntimeError('suma kontrolna pobranego pliku sie nie zgadza')
+        raise RuntimeError('suma kontrolna pobranego pliku się nie zgadza')
 
-    akt_stan(etap='podmieniam aplikacje', procent=100)
+    akt_stan(etap='podmieniam aplikację', procent=100)
     if sys.platform == 'darwin':
         skrypt = os.path.join(tmp, 'podmien.sh')
         open(skrypt, 'w').write(f"""#!/bin/bash
@@ -598,7 +598,7 @@ def przebieg(pliki, model, na_req, rpm):
         wczesniej = stan_wczytaj(folder)          # to, co juz odczytano wczesniej
         mapa = dict(wczesniej)
         if wczesniej:
-            log(f'wznawiam — {len(wczesniej)} zdjec bylo juz odczytanych')
+            log(f'wznawiam — {len(wczesniej)} zdjęć było już odczytanych')
 
         do_zrobienia = [p for p in pliki if os.path.basename(p) not in mapa]
         with BLOKADA:
@@ -609,7 +609,7 @@ def przebieg(pliki, model, na_req, rpm):
         for nr_p, p in enumerate(do_zrobienia, 1):
             if STAN['stop']:
                 break
-            faza(f'kadruje {nr_p}/{len(do_zrobienia)}: {os.path.basename(p)}')
+            faza(f'kadruję {nr_p}/{len(do_zrobienia)}: {os.path.basename(p)}')
             k = kadruj(p)
             if k is None:
                 bez_czerwieni.append(p)
@@ -628,7 +628,7 @@ def przebieg(pliki, model, na_req, rpm):
         odstep = 60.0 / max(rpm, 1)
         with BLOKADA:
             STAN.update(etap='odczyt', ile=len(paczki), zrobione=0)
-        log(f'{len(paczki)} zapytan do {model}, co {odstep:.0f} s')
+        log(f'{len(paczki)} zapytań do {model}, co {odstep:.0f} s')
 
         ostatnie, brak_limitu = 0.0, False
         for nr, paczka in enumerate(paczki, 1):
@@ -646,10 +646,10 @@ def przebieg(pliki, model, na_req, rpm):
             while proba < 4 and kody is None and not STAN['stop']:
                 try:
                     ostatnie = time.time()
-                    faza(f'paczka {nr}/{len(paczki)} — wyslane {len(paczka)} kadrow, '
-                         f'czekam na odpowiedz…')
+                    faza(f'paczka {nr}/{len(paczki)} — wysłane {len(paczka)} kadrów, '
+                         f'czekam na odpowiedź…')
                     kody = czytaj_paczke([j for _, j in paczka], model)
-                    faza(f'paczka {nr}/{len(paczki)} — odpowiedz po '
+                    faza(f'paczka {nr}/{len(paczki)} — odpowiedź po '
                          f'{time.time()-ostatnie:.0f} s')
                     zuzycie(1)                       # doliczamy do licznika dobowego
                     with BLOKADA:
@@ -659,10 +659,10 @@ def przebieg(pliki, model, na_req, rpm):
                     if e.code in (429, 500, 503):        # limit albo chwilowy blad
                         proba += 1
                         pauza = min(60, 5 * 2 ** proba)
-                        log(f'paczka {nr}: HTTP {e.code}, czekam {pauza} s (proba {proba}/3)')
+                        log(f'paczka {nr}: HTTP {e.code}, czekam {pauza} s (próba {proba}/3)')
                         if e.code == 429 and proba >= 3:
-                            log('LIMIT WYCZERPANY — zapisuje to, co juz odczytane, '
-                                'reszta czeka na nastepny raz')
+                            log('LIMIT WYCZERPANY — zapisuję to, co już odczytane, '
+                                'reszta czeka na następny raz')
                             brak_limitu = True
                             break
                         for _ in range(pauza * 2):
@@ -670,7 +670,7 @@ def przebieg(pliki, model, na_req, rpm):
                                 break
                             time.sleep(0.5)
                     else:
-                        log(f'paczka {nr}: HTTP {e.code} {tresc} — koncze odczyt, '
+                        log(f'paczka {nr}: HTTP {e.code} {tresc} — kończę odczyt, '
                             'nazywam to, co gotowe')
                         brak_limitu = True
                         break
@@ -694,13 +694,13 @@ def przebieg(pliki, model, na_req, rpm):
                 STAN.update(etap='drugie podejscie', ile=1, zrobione=0)
             znane = sorted({k.replace('+wiele', '') for k in mapa.values()
                             if k and k != '?'})
-            log(f'drugie podejscie: {len(nieudane)} zdjec w calosci, '
-                f'kontekst {len(znane)} znanych numerow')
+            log(f'drugie podejście: {len(nieudane)} zdjęć w całości, '
+                f'kontekst {len(znane)} znanych numerów')
             try:
                 # przerwa na limit RPM przed dodatkowym zapytaniem
                 czekaj = odstep - (time.time() - ostatnie)
                 while czekaj > 0 and not STAN['stop']:
-                    faza(f'pauza na limit — {int(czekaj)+1} s do drugiego podejscia')
+                    faza(f'pauza na limit — {int(czekaj)+1} s do drugiego podejścia')
                     time.sleep(min(0.5, czekaj))
                     czekaj = odstep - (time.time() - ostatnie)
 
@@ -710,7 +710,7 @@ def przebieg(pliki, model, na_req, rpm):
                     if not jpgi:
                         continue
                     ostatnie = time.time()
-                    faza(f'drugie podejscie — {len(jpgi)} pelnych zdjec, czekam…')
+                    faza(f'drugie podejście — {len(jpgi)} pełnych zdjęć, czekam…')
                     kody = czytaj_paczke(jpgi, model,
                                          PROMPT2 % ('\n'.join('- ' + z for z in znane) or '- (brak)'))
                     zuzycie(1)
@@ -722,10 +722,10 @@ def przebieg(pliki, model, na_req, rpm):
                             mapa[os.path.basename(x)] = kod
                             odzysk += 1
                             log(f'  odzyskane: {os.path.basename(x)} -> {kod}')
-                    log(f'drugie podejscie: odzyskano {odzysk}/{len(czesc)}')
+                    log(f'drugie podejście: odzyskano {odzysk}/{len(czesc)}')
                     stan_zapisz(folder, mapa)
             except Exception as e:
-                log(f'drugie podejscie nieudane: {type(e).__name__}: {e}')
+                log(f'drugie podejście nieudane: {type(e).__name__}: {e}')
             with BLOKADA:
                 STAN['zrobione'] = 1
 
@@ -734,7 +734,7 @@ def przebieg(pliki, model, na_req, rpm):
         # zeby pasek nie stal na 100% przez ostatnia jedna trzecia czasu
         with BLOKADA:
             STAN.update(etap='zapisywanie', ile=len(pliki), zrobione=0)
-        faza('zapisuje pliki…')
+        faza('zapisuję pliki…')
         cel_dir = os.path.join(folder, 'Kopia z kodami')
         os.makedirs(cel_dir, exist_ok=True)
         with BLOKADA:
@@ -746,7 +746,7 @@ def przebieg(pliki, model, na_req, rpm):
                 STAN['zrobione'] = nr_p
             nazwa = os.path.basename(p)
             if nr_p % 5 == 0 or nr_p == len(pliki):
-                faza(f'zapisuje {nr_p}/{len(pliki)}: {nazwa}')
+                faza(f'zapisuję {nr_p}/{len(pliki)}: {nazwa}')
             kod = mapa.get(nazwa)
             if kod is None:
                 continue
@@ -770,22 +770,22 @@ def przebieg(pliki, model, na_req, rpm):
                 shutil.copy2(p, cel)              # kopia 1:1, oryginal nietkniety
                 wyniki.append({'stary': nazwa, 'nowy': os.path.basename(cel), 'kod': kod})
             except Exception as e:
-                log(f'nie udalo sie {nazwa}: {e}')
+                log(f'nie udało się {nazwa}: {e}')
 
         with BLOKADA:
             STAN['wyniki'] = wyniki
         if brak_limitu:
             zostalo = len([p for p in pliki if os.path.basename(p) not in mapa])
-            log(f'PRZERWANE PRZEZ LIMIT — nazwane {ile_ok + ile_spr} plikow, '
+            log(f'PRZERWANE PRZEZ LIMIT — nazwane {ile_ok + ile_spr} plików, '
                 f'{zostalo} czeka. Uruchom ponownie na tym samym folderze, '
-                f'program dokonczy od tego miejsca.')
+                f'program dokończy od tego miejsca.')
         log(f'GOTOWE — rozpoznane {ile_ok}'
             + (f' (w tym {ile_wiele} z wieloma etykietami)' if ile_wiele else '')
-            + f', do sprawdzenia {ile_spr}, zapytan {STAN["req"]}')
+            + f', do sprawdzenia {ile_spr}, zapytań {STAN["req"]}')
         log(f'pliki w: {cel_dir}')
 
     except Exception as e:
-        log(f'BLAD: {type(e).__name__}: {e}')
+        log(f'BŁĄD: {type(e).__name__}: {e}')
     finally:
         with BLOKADA:
             STAN.update(pracuje=False, gotowe=True, etap='koniec', faza='',
@@ -928,7 +928,7 @@ class H(http.server.BaseHTTPRequestHandler):
                 return dict(AKT)
         if path == '/api/reset':
             if STAN['pracuje']:
-                return {'error': 'najpierw przerwij prace'}
+                return {'error': 'najpierw przerwij pracę'}
             with BLOKADA:
                 STAN.update(log=[], wyniki=[], req=0, zrobione=0, ile=0,
                             etap='gotowy', gotowe=False, folder='', cel='')
@@ -945,10 +945,10 @@ class H(http.server.BaseHTTPRequestHandler):
             return {'modele': lista_modeli()}
         if path == '/api/start':
             if STAN['pracuje']:
-                return {'error': 'juz pracuje'}
+                return {'error': 'już pracuje'}
             pliki = r.get('pliki') or []
             if not pliki:
-                return {'error': 'brak plikow'}
+                return {'error': 'brak plików'}
             U = cfg_wczytaj()
             if not U.get('klucz', '').strip():
                 return {'error': 'brak klucza API — wpisz go w Ustawieniach'}
@@ -1163,17 +1163,17 @@ button.zielony{background:
   <h1><img src="data:image/png;base64,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" alt=""><span>DEPO<span class="g">SKAN</span></span>
     <button class="odsw zeb" onclick="ustOtworz()" title="Ustawienia">&#9881;</button>
     <button class="odsw obr" style="margin-left:10px" onclick="odswiez()"
-            title="Odswiez">&#8635;</button></h1>
+            title="Odśwież">&#8635;</button></h1>
 
   <div class="kolumny">
     <!-- ── LEWA: wybor zdjec i sterowanie ─────────────────────────────── -->
     <div class="lewa">
       <div class="drop" id="drop" onclick="dodaj()">
-        <div class="big" id="dropTxt">Wybierz zdjecia</div>
+        <div class="big" id="dropTxt">Wybierz zdjęcia</div>
       </div>
 
       <div class="naglowek" id="naglowek" style="display:none">
-        <span id="ilePlikow"></span><a onclick="wyczysc(event)">wyczysc liste</a>
+        <span id="ilePlikow"></span><a onclick="wyczysc(event)">wyczyść listę</a>
       </div>
       <div class="pliki" id="pliki"></div>
 
@@ -1206,7 +1206,7 @@ button.zielony{background:
       <div class="sekcja" style="margin-top:12px">Log</div>
       <div class="log" id="log"></div>
       <div class="stopka">
-        <button class="ghost" id="pokaz" onclick="pokaz()" disabled>Pokaz wyniki w Finderze</button>
+        <button class="ghost" id="pokaz" onclick="pokaz()" disabled>Pokaż wyniki w Finderze</button>
       </div>
     </div>
   </div>
@@ -1221,7 +1221,7 @@ button.zielony{background:
     </div>
     <button class="zielony" id="aktPobierz">Zaktualizuj i uruchom ponownie</button>
     <button class="ghost" id="aktPozniej"
-            onclick="$('modalAkt').classList.remove('on')">Pozniej</button>
+            onclick="$('modalAkt').classList.remove('on')">Później</button>
   </div>
 </div>
 
@@ -1231,7 +1231,7 @@ button.zielony{background:
     <div class="powiad" id="powiad"></div>
 
     <div class="pole"><label>Klucz API Google AI Studio</label>
-      <input id="uKlucz" type="password" spellcheck="false" placeholder="wklej klucz"></div>
+      <input id="uKlucz" type="password" spellcheck="false" placeholder="wklej klucz API"></div>
 
     <div class="opcje">
       <div class="pole pelna"><label>Model</label>
@@ -1241,13 +1241,13 @@ button.zielony{background:
           <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
           <option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option>
         </select></div>
-      <div class="pole"><label>Kadrow w zapytaniu</label>
+      <div class="pole"><label>Kadrów w zapytaniu</label>
         <input id="uNaReq" type="number" min="1" max="30"></div>
-      <div class="pole"><label>Zapytan na minute</label>
+      <div class="pole"><label>Zapytań na minutę</label>
         <input id="uRpm" type="number" min="1" max="60"></div>
     </div>
 
-    <button class="ghost" onclick="akt()">Sprawdz aktualizacje</button>
+    <button class="ghost" onclick="akt()">Sprawdź aktualizacje</button>
     <div class="info" id="uInfo"></div>
 
     <button onclick="ustZapisz()">Zapisz</button>
@@ -1269,7 +1269,7 @@ function dodaj(){
     const przed = PLIKI.length;
     (d.pliki || []).forEach(p => { if (!PLIKI.includes(p)) PLIKI.push(p); });
     if (PLIKI.length === przed && (d.pliki||[]).length)
-      $('err').textContent = 'te pliki juz sa na liscie';
+      $('err').textContent = 'te pliki już są na liście';
     rysuj();
   });
 }
@@ -1281,12 +1281,12 @@ function rysuj(){
   box.innerHTML = '';
   if (!PLIKI.length){
     box.classList.remove('on'); nag.style.display = 'none';
-    $('dropTxt').textContent = 'Wybierz zdjecia';
+    $('dropTxt').textContent = 'Wybierz zdjęcia';
     $('go').disabled = true; return;
   }
   box.classList.add('on'); nag.style.display = 'flex';
   $('dropTxt').textContent = PLIKI.length + ' ' +
-    (PLIKI.length === 1 ? 'zdjecie' : (PLIKI.length < 5 ? 'zdjecia' : 'zdjec'));
+    (PLIKI.length === 1 ? 'zdjęcie' : (PLIKI.length < 5 ? 'zdjęcia' : 'zdjęć'));
   $('ilePlikow').textContent = PLIKI.length + ' na liscie';
   PLIKI.forEach((p, i) => {
     const d = document.createElement('div');
@@ -1340,8 +1340,8 @@ function ustWczytaj(pokazJesliBrak){
     sel.value = U.model;
     if (U.ma_klucz) modele();           // odswiez liste modeli z konta
     if (pokazJesliBrak && !U.ma_klucz){
-      $('powiad').textContent = 'Zeby zaczac, wklej klucz API z Google AI Studio ' +
-        '(aistudio.google.com/apikey). Reszta ustawien jest juz gotowa.';
+      $('powiad').textContent = 'Żeby zacząć, wklej klucz API z Google AI Studio ' +
+        '(aistudio.google.com/apikey). Reszta ustawień jest już gotowa.';
       $('powiad').classList.add('on');
       ustOtworz();
     }
@@ -1364,8 +1364,8 @@ function ustZapisz(){
 function aktStart(){
   post('/api/aktualizacja').then(a => {
     if (a.blad || !a.nowsza) return;
-    $('aktTxt').innerHTML = 'Dostepna jest wersja <b>' + a.najnowsza +
-      '</b>.<br>Masz zainstalowana ' + a.wersja + '.';
+    $('aktTxt').innerHTML = 'Dostępna jest wersja <b>' + a.najnowsza +
+      '</b>.<br>Masz zainstalowaną ' + a.wersja + '.';
     $('aktPobierz').onclick = () => zaktualizuj(a);
     $('modalAkt').classList.add('on');
   });
@@ -1374,9 +1374,9 @@ function aktStart(){
 function zaktualizuj(a){
   const b = $('aktPobierz');
   b.disabled = true; $('aktPozniej').disabled = true;
-  b.textContent = 'Aktualizuje…';
-  $('aktTxt').innerHTML = 'Pobieram wersje <b>' + a.najnowsza +
-    '</b>. Aplikacja zamknie sie i otworzy ponownie sama.';
+  b.textContent = 'Aktualizuję…';
+  $('aktTxt').innerHTML = 'Pobieram wersję <b>' + a.najnowsza +
+    '</b>. Aplikacja zamknie się i otworzy ponownie sama.';
   $('aktPasek').style.display = 'block';
   post('/api/zaktualizuj').then(w => {
     if (w.error){ aktBlad(w.error); return; }
@@ -1386,7 +1386,7 @@ function zaktualizuj(a){
 
 function aktBlad(txt){
   $('aktPobierz').disabled = false; $('aktPozniej').disabled = false;
-  $('aktPobierz').textContent = 'Sprobuj ponownie';
+  $('aktPobierz').textContent = 'Spróbuj ponownie';
   $('aktPasek').style.display = 'none';
   $('aktTxt').textContent = txt;
 }
@@ -1398,7 +1398,7 @@ function sledzAkt(){
   const tik = setInterval(() => {
     post('/api/stan_akt').then(A => {
       if (A.blad){ clearInterval(tik); aktBlad(A.blad); return; }
-      if (A.etap === 'podmieniam aplikacje' || A.gotowe) podmieniano = true;
+      if (A.etap === 'podmieniam aplikację' || A.gotowe) podmieniano = true;
       $('aktFill').style.width = (A.procent || 0) + '%';
       $('aktEtap').textContent = A.etap || '';
       $('aktMb').textContent = A.mb_calosc
@@ -1422,15 +1422,15 @@ function sledzAkt(){
 function akt(){
   $('uInfo').textContent = 'sprawdzam…';
   post('/api/aktualizacja').then(a => {
-    if (a.blad){ $('uInfo').textContent = 'nie sprawdzilem: ' + a.blad; return; }
+    if (a.blad){ $('uInfo').textContent = 'nie sprawdziłem: ' + a.blad; return; }
     if (a.nowsza){
       $('uInfo').textContent = '';
-      $('aktTxt').innerHTML = 'Dostepna jest wersja <b>' + a.najnowsza +
-        '</b>.<br>Masz zainstalowana ' + a.wersja + '.';
+      $('aktTxt').innerHTML = 'Dostępna jest wersja <b>' + a.najnowsza +
+        '</b>.<br>Masz zainstalowaną ' + a.wersja + '.';
       $('aktPobierz').onclick = () => zaktualizuj(a);
       ustZamknij();
       $('modalAkt').classList.add('on');
-    } else $('uInfo').textContent = 'masz najnowsza wersje (' + a.wersja + ')';
+    } else $('uInfo').textContent = 'masz najnowszą wersję (' + a.wersja + ')';
   });
 }
 
@@ -1484,12 +1484,12 @@ function tik(){
       $('pokaz').disabled = false;
       post('/api/zuzycie').then(d => { if (d.dzis != null) licznik(d.dzis, d.data); });
       const w = $('wyn'); w.innerHTML = '';
-      if (!(s.wyniki||[]).length) w.innerHTML = '<div class="pusto">brak wynikow</div>';
+      if (!(s.wyniki||[]).length) w.innerHTML = '<div class="pusto">brak wyników</div>';
       (s.wyniki||[]).forEach(r => {
         const d = document.createElement('div');
         const wiele = r.kod.endsWith('+wiele');
         d.className = 'row' + (r.kod === '?' ? ' spr' : (wiele ? ' wiele' : ''));
-        const bad = r.kod === '?' ? 'warn">sprawdz' : (wiele ? 'wiele">wiele etykiet' : 'ok">ok');
+        const bad = r.kod === '?' ? 'warn">sprawdź' : (wiele ? 'wiele">wiele etykiet' : 'ok">ok');
         d.innerHTML = '<span class="badge ' + bad + '</span><span class="kod">' +
           (r.kod === '?' ? '—' : r.kod.replace('+wiele','')) +
           '</span><span class="str">' + r.nowy + '</span>';
@@ -1508,7 +1508,7 @@ ustWczytaj(true);          // pierwszy start otworzy Ustawienia
 aktStart();                // ciche sprawdzenie aktualizacji
 
 function licznik(n, data){
-  $('zuz').textContent = 'dzis: ' + n;
+  $('zuz').textContent = 'dziś: ' + n;
 }
 </script></body></html>"""
 

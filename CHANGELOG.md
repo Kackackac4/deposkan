@@ -19,6 +19,17 @@ Nic w toku.
 
 ---
 
+## [1.0.8] — 2026-09-08
+
+### Poprawione
+
+- **Polskie znaki w całym interfejsie.** Teksty w oknie, komunikaty i wpisy w logu
+  były pisane bez ogonków („Kadrow w zapytaniu", „zapisuje pliki", „drugie podejscie").
+  Teraz wszystko jest po polsku poprawnie. Nazwy plików i funkcji zostały bez zmian —
+  celowo, żeby nie psuć zgodności między systemami.
+
+---
+
 ## [1.0.7] — 2026-09-08
 
 ### Zmienione
@@ -187,7 +198,8 @@ pliku źródłowego.
   do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
   zejść niżej.
 
-[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.7...HEAD
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.8...HEAD
+[1.0.8]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.8
 [1.0.7]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.7
 [1.0.6]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.6
 [1.0.5]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.5
