@@ -1,5 +1,10 @@
 # DEPOSKAN
 
+[![Build](https://github.com/Kackackac4/deposkan/actions/workflows/build.yml/badge.svg)](https://github.com/Kackackac4/deposkan/actions/workflows/build.yml)
+[![Wydanie](https://img.shields.io/github/v/release/Kackackac4/deposkan?label=wydanie)](https://github.com/Kackackac4/deposkan/releases/latest)
+[![Pobrania](https://img.shields.io/github/downloads/Kackackac4/deposkan/total?label=pobrania)](https://github.com/Kackackac4/deposkan/releases)
+![Platformy](https://img.shields.io/badge/platformy-macOS%20%7C%20Windows-lightgrey)
+
 Rozpoznawanie ręcznie pisanych numerów zamówień ze zdjęć paczek.
 
 OpenCV znajduje lokalnie czerwony numer i przycina kadr (za darmo, ~0,1 s na zdjęcie),
@@ -62,6 +67,27 @@ git tag v1.0.1 && git push --tags
 
 Workflow (`.github/workflows/build.yml`) zbuduje oba pliki i utworzy Release.
 Aplikacja sama sprawdza Releases przez „Sprawdź aktualizacje" w Ustawieniach.
+
+## Czy to bezpieczne
+
+Aplikacja nie ma certyfikatu Apple ani Microsoftu (kosztują one kilkaset złotych
+rocznie), więc oba systemy ostrzegają przy pierwszym uruchomieniu. Ostrzeżenie mówi
+tylko tyle, że **nikt nie zapłacił za certyfikat** — nie że coś jest nie tak z plikiem.
+
+Można to sprawdzić samodzielnie:
+
+- **Kod jest jawny** — cały program to jeden plik [DEPOSKAN.py](DEPOSKAN.py), można go
+  przeczytać w kwadrans. Nie ma w nim żadnej komunikacji poza Google Gemini.
+- **Pliki buduje GitHub, nie prywatny komputer** — każde wydanie powstaje automatycznie
+  z kodu w tym repozytorium, a [przebieg budowania](https://github.com/Kackackac4/deposkan/actions)
+  jest publiczny i można go obejrzeć krok po kroku.
+- **Sumy kontrolne** — każde wydanie ma `checksums.txt` z sumami SHA-256, więc da się
+  sprawdzić, czy pobrany plik jest dokładnie tym, który zbudował GitHub.
+- **Można zbudować samemu** — instrukcja niżej; wynik będzie taki sam.
+
+Antywirus na Windows może zgłosić fałszywy alarm, bo program jest spakowany
+PyInstallerem, a ten sposób pakowania bywa używany także przez złośliwe
+oprogramowanie. To znany problem PyInstallera, nie oznaka infekcji.
 
 ## Historia zmian
 

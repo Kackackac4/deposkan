@@ -45,7 +45,10 @@ jobs:
             --hidden-import objc --hidden-import Foundation \
             --hidden-import AppKit --hidden-import WebKit \
             DEPOSKAN.py
-          cd dist && zip -qry DEPOSKAN-macOS.zip DEPOSKAN.app
+          # ditto zachowuje atrybuty i dowiazania w bundlu — zwykly zip potrafi
+          # zepsuc podpis, a wtedy macOS mowi "plik uszkodzony" zamiast zwyklego
+          # ostrzezenia o niezweryfikowanym tworcy
+          cd dist && ditto -c -k --sequesterRsrc --keepParent DEPOSKAN.app DEPOSKAN-macOS.zip
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
@@ -70,10 +73,28 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { path: pliki }
 
+      - name: Sumy kontrolne
+        run: |
+          cd pliki && find . -type f \( -name '*.zip' -o -name '*.exe' \) -exec sha256sum {} \; \
+            | sed 's|\./[^/]*/||' > ../checksums.txt
+          cat ../checksums.txt
+
       - name: Wydanie
         uses: softprops/action-gh-release@v2
         with:
           files: |
             pliki/**/DEPOSKAN-macOS.zip
             pliki/**/DEPOSKAN.exe
+            checksums.txt
           generate_release_notes: true
+          body: |
+            ## Pobieranie
+
+            - **macOS** — `DEPOSKAN-macOS.zip`
+            - **Windows** — `DEPOSKAN.exe`
+
+            Przy pierwszym uruchomieniu system pokaże ostrzeżenie, bo aplikacja nie ma
+            certyfikatu — instrukcja zatwierdzenia jest w [README](../../#macos-blokuje-pierwsze-uruchomienie).
+
+            Pliki zbudował GitHub Actions z kodu w tym repozytorium; przebieg budowania
+            jest jawny. Sumy kontrolne SHA-256 w `checksums.txt`.
