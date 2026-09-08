@@ -19,6 +19,21 @@ Nic w toku.
 
 ---
 
+## [1.0.5] — 2026-09-08
+
+### Zmienione
+
+- **Pasek postępu pokazuje też zapisywanie plików.** Wcześniej po zakończeniu odczytu
+  stał na 100%, podczas gdy kopiowanie kilkuset zdjęć trwało jeszcze długo. Teraz
+  ostatni etap ma własny postęp i opis (`zapisuje 120/175: _DSC0120.JPG`).
+- Pasek postępu dwa razy wyższy.
+- Przycisk „Zacznij" nazywa się teraz **„Skanuj"** i siedzi na stałe u dołu lewej
+  kolumny; lista wybranych zdjęć zajmuje całą przestrzeń nad nim.
+- Zębatka ustawień powiększona do rozmiaru strzałki odświeżania, wyśrodkowana
+  i już się nie obraca przy najechaniu (obraca się tylko strzałka).
+
+---
+
 ## [1.0.4] — 2026-09-08
 
 ### Zmienione
@@ -143,7 +158,8 @@ pliku źródłowego.
   do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
   zejść niżej.
 
-[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.4...HEAD
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.5
 [1.0.4]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.4
 [1.0.3]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.3
 [1.0.2]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.2
