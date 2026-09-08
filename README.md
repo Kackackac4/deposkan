@@ -36,6 +36,10 @@ git tag v1.0.1 && git push --tags
 Workflow (`.github/workflows/build.yml`) zbuduje oba pliki i utworzy Release.
 Aplikacja sama sprawdza Releases przez „Sprawdź aktualizacje" w Ustawieniach.
 
+## Historia zmian
+
+Co doszło w której wersji: [CHANGELOG.md](CHANGELOG.md).
+
 ## Jak to działa
 
 Opis algorytmu detekcji, zasady odczytu i pułapki: [DEPOSKAN.md](DEPOSKAN.md).

@@ -1,0 +1,86 @@
+# Historia zmian
+
+Format oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.1.0/).
+Numeracja wersji: `GŁÓWNA.POBOCZNA.POPRAWKA`.
+
+Wersję podnosi się w stałej `WERSJA` w pliku `DEPOSKAN.py`, a wydanie tworzy tag:
+
+```bash
+git tag v1.0.1 && git push --tags
+```
+
+GitHub Actions zbuduje wtedy `.app` i `.exe` i utworzy Release.
+
+---
+
+## [Niewydane]
+
+Nic w toku.
+
+---
+
+## [1.0.0] — 2026-09-08
+
+Pierwsze wydanie. Aplikacja okienkowa na macOS i Windows, zbudowana z jednego
+pliku źródłowego.
+
+### Dodane
+
+**Rozpoznawanie numerów**
+- Detekcja czerwonego odręcznego numeru w OpenCV — lokalnie i za darmo, ok. 0,1 s
+  na zdjęcie. Maska łączy zakres HSV z testem przewagi czerwieni nad zielenią
+  i niebieskim, dzięki czemu drewniany blat i beżowe tło nie są brane za pisak.
+- Próg wykrywania dobiera się do oświetlenia zdjęcia (kontrast pisaka potrafi się
+  różnić trzykrotnie między ujęciami).
+- Filtr gęstości odrzuca lite plamy — różowe karteczki, czerwoną taśmę, czerwone
+  przedmioty — bo pismo to cienkie kreski, a nie wypełniony prostokąt.
+- Kadr wycinany z pełnej rozdzielczości z dużym zapasem, żeby nic nie było ucięte.
+- Odczyt kadrów przez Gemini z wymuszoną odpowiedzią w JSON.
+
+**Odporność na błędy**
+- Drugie podejście: zdjęcia, na których nic nie znaleziono, lecą jednym zapytaniem
+  jako całe, nieprzycięte kadry, z listą numerów już rozpoznanych w tej partii
+  jako podpowiedzią.
+- Wyczerpanie limitu nie kasuje pracy — to, co odczytane, dostaje nazwy i trafia
+  do folderu, a reszta czeka. Ponowne uruchomienie na tym samym folderze dokańcza
+  robotę i nie duplikuje plików.
+- Trzy próby z narastającą pauzą (10/20/40 s) przy błędach 429, 500 i 503.
+- Kadry z kilkoma etykietami naraz dostają najlepiej widoczny numer i dopisek
+  `+wiele` zamiast lądować w koszu jako nieczytelne.
+
+**Nazewnictwo i pliki**
+- Wyniki trafiają do podfolderu **„Kopia z kodami"**, oryginały zostają nietknięte.
+- Nazwa pliku zachowuje kolejność zdjęć: `DSC0002_P5204707-1.JPG`, a nierozpoznane
+  `DSC0019_sprawdz.JPG`.
+- Kopie są bajt w bajt identyczne z oryginałami, z zachowaniem EXIF i daty.
+
+**Interfejs**
+- Dwie kolumny: po lewej wybór zdjęć i sterowanie, po prawej postęp, wyniki i log —
+  nic się nie przewija poza swoją kolumną.
+- Lista wybranych plików z możliwością usuwania pojedynczych pozycji; kolejne
+  kliknięcia dokładają zdjęcia zamiast kasować listę.
+- Podgląd pracy na żywo (co program robi w tej sekundzie), timer i szklany
+  zielony pasek postępu.
+- Ustawienia w osobnym oknie: klucz API, model, liczba kadrów w zapytaniu,
+  zapytania na minutę.
+- Lista modeli pobierana automatycznie z konta przy starcie; domyślnie
+  `gemini-3.5-flash-lite`.
+- Sprawdzanie aktualizacji przy uruchomieniu — gdy jest nowsza wersja, pojawia się
+  okno z przyciskiem pobierania.
+
+### Bezpieczeństwo
+
+- **Klucz API nie znajduje się w kodzie.** Wpisuje się go w Ustawieniach, a zapisuje
+  lokalnie w katalogu ustawień systemu.
+
+### Uwagi
+
+- Klasyczne OCR nie nadaje się do tego zadania — Tesseract, nawet na idealnie
+  przygotowanym czarno-białym piśmie z listą dozwolonych znaków, trafił 0 na 9.
+  Powód jest strukturalny: jest trenowany na druku. Szczegóły w [DEPOSKAN.md](DEPOSKAN.md).
+- Przy dużych paczkach kadrów w jednym zapytaniu spada trafność przypisania numeru
+  do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
+  zejść niżej.
+
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.0
