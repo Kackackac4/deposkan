@@ -255,9 +255,14 @@ Lepiej 33 zdjęcia do ręcznego przejrzenia niż jedno zamówienie z błędnym n
 
 | Wzorzec | Znaczenie |
 |---|---|
-| `P5204707-1_DSC0002.jpg` | rozpoznany kod + zachowany oryginalny numer DSC |
-| `sprawdz_DSC0024.jpg` | AI nie było pewne |
-| `_DSC0001_DO-SPRAWDZENIA.jpg` | skrypt nie wykrył czerwieni |
+| `DSC0002_P5204707-1.jpg` | numer zdjęcia z przodu (zachowuje kolejność), potem kod |
+| `DSC0019_sprawdz.jpg` | nie udało się odczytać |
+| `DSC0169_P5204706-1+wiele.jpg` | w kadrze było kilka etykiet, to najlepiej widoczna |
+
+> Aplikacja `DEPOSKAN.py` używa powyższego nazewnictwa i zapisuje wyniki do podfolderu
+> **„Kopia z kodami"**. Starsze skrypty (`wytnij_numery.py`, `przenies_oryginaly.py`)
+> pochodzą z pierwszego, ręcznego podejścia i stosują odwrotną kolejność
+> (`KOD_DSCxxxx.jpg`) — trzymaj to w głowie przy mieszaniu jednego z drugim.
 
 **Numer `DSCxxxx` musi zostać w nazwie** — to jedyny klucz łączący kadr z oryginałem.
 

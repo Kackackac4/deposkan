@@ -3,7 +3,9 @@
 Rozpoznawanie ręcznie pisanych numerów zamówień ze zdjęć paczek.
 
 OpenCV znajduje lokalnie czerwony numer i przycina kadr (za darmo, ~0,1 s na zdjęcie),
-a do Gemini idą tylko małe wycinki. Oryginały dostają nazwy `KOD_DSCxxxx.JPG`.
+a do Gemini idą tylko małe wycinki. Kopie oryginałów trafiają do podfolderu
+**„Kopia z kodami"** pod nazwą `DSC0002_P5204707-1.JPG` — numer zdjęcia z przodu,
+żeby zachować kolejność. Nierozpoznane dostają `DSC0019_sprawdz.JPG`.
 
 ## Uruchomienie
 
