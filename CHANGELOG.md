@@ -19,6 +19,22 @@ Nic w toku.
 
 ---
 
+## [1.0.1] — 2026-09-08
+
+### Poprawione
+
+- Wydanie na macOS pakowane przez `ditto` zamiast `zip`. Zwykły `zip` gubi atrybuty
+  i dowiązania w bundlu, przez co podpis potrafił się zepsuć, a system pokazywał
+  „plik uszkodzony" zamiast zwykłego ostrzeżenia o niezweryfikowanym twórcy.
+
+### Dodane
+
+- Każde wydanie zawiera `checksums.txt` z sumami SHA-256 obu plików.
+- README wyjaśnia, skąd biorą się ostrzeżenia systemowe i jak samodzielnie
+  zweryfikować pobrane pliki.
+
+---
+
 ## [1.0.0] — 2026-09-08
 
 Pierwsze wydanie. Aplikacja okienkowa na macOS i Windows, zbudowana z jednego
@@ -82,5 +98,6 @@ pliku źródłowego.
   do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
   zejść niżej.
 
-[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.0...HEAD
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.0
