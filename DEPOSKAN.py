@@ -21,7 +21,7 @@ Uwaga o limitach: darmowy tier ma niski limit requestow na dobe, dlatego kadry
 leca paczkami (kilka obrazow w jednym requescie), a postep zapisuje sie na dysk —
 gdy limit sie skonczy, nastepnego dnia program dokonczy od miejsca przerwania.
 """
-import base64, http.server, json, os, re, shutil, socket, subprocess, sys
+import base64, http.server, json, os, re, shutil, socket, subprocess, sys, tempfile
 import threading, time, urllib.error, urllib.request
 
 import cv2
@@ -30,7 +30,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.0.2'
+WERSJA = '1.0.3'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 
 # Domyslne ustawienia — uzytkownik zmienia je w oknie Ustawienia, zapisuja sie na dysk.
@@ -327,6 +327,123 @@ def sprawdz_aktualizacje():
             break
     return {'wersja': WERSJA, 'najnowsza': naj, 'nowsza': nowsza,
             'link': link, 'opis': (d.get('body') or '')[:300]}
+
+
+def sciezka_aplikacji():
+    """Gdzie leży zainstalowana aplikacja. None, gdy chodzimy ze zrodel."""
+    if not getattr(sys, 'frozen', False):
+        return None
+    if sys.platform == 'darwin':
+        # .../DEPOSKAN.app/Contents/MacOS/DEPOSKAN  ->  .../DEPOSKAN.app
+        p = os.path.abspath(sys.executable)
+        for _ in range(3):
+            p = os.path.dirname(p)
+        return p if p.endswith('.app') else None
+    return os.path.abspath(sys.executable)
+
+
+def pobierz_z_kontrola(url, cel, suma_url=None, nazwa=None):
+    """Pobiera plik i — jesli sa sumy kontrolne — sprawdza SHA-256."""
+    with urllib.request.urlopen(urllib.request.Request(
+            url, headers={'User-Agent': 'deposkan'}), timeout=300) as r, open(cel, 'wb') as f:
+        calosc = int(r.headers.get('Content-Length') or 0)
+        mam = 0
+        while True:
+            kawalek = r.read(262144)
+            if not kawalek:
+                break
+            f.write(kawalek)
+            mam += len(kawalek)
+            if calosc:
+                faza(f'pobieram aktualizacje… {100*mam//calosc}%')
+
+    if not (suma_url and nazwa):
+        return True
+    try:
+        with urllib.request.urlopen(urllib.request.Request(
+                suma_url, headers={'User-Agent': 'deposkan'}), timeout=30) as r:
+            sumy = r.read().decode()
+    except Exception:
+        return True                       # brak pliku sum — nie blokujemy aktualizacji
+    import hashlib
+    oczekiwana = None
+    for linia in sumy.splitlines():
+        czesci = linia.split()
+        if len(czesci) == 2 and czesci[1].lstrip('*') == nazwa:
+            oczekiwana = czesci[0]
+    if not oczekiwana:
+        return True
+    h = hashlib.sha256()
+    with open(cel, 'rb') as f:
+        for blok in iter(lambda: f.read(1 << 20), b''):
+            h.update(blok)
+    return h.hexdigest() == oczekiwana
+
+
+def zaktualizuj():
+    """Pobiera nowe wydanie i podmienia zainstalowana aplikacje w miejscu."""
+    cel = sciezka_aplikacji()
+    if not cel:
+        raise RuntimeError('aktualizacja dziala tylko w zainstalowanej aplikacji')
+
+    a = sprawdz_aktualizacje()
+    if a.get('blad'):
+        raise RuntimeError(a['blad'])
+    if not a.get('nowsza'):
+        return {'ok': False, 'info': 'masz juz najnowsza wersje'}
+
+    faza('pobieram aktualizacje…')
+    tmp = tempfile.mkdtemp(prefix='deposkan-akt-')
+    nazwa = os.path.basename(a['link'].split('?')[0])
+    paczka = os.path.join(tmp, nazwa)
+    sumy = f"https://github.com/{REPO}/releases/download/v{a['najnowsza']}/checksums.txt"
+    if not pobierz_z_kontrola(a['link'], paczka, sumy, nazwa):
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise RuntimeError('suma kontrolna pobranego pliku sie nie zgadza')
+
+    faza('przygotowuje podmiane…')
+    if sys.platform == 'darwin':
+        skrypt = os.path.join(tmp, 'podmien.sh')
+        open(skrypt, 'w').write(f"""#!/bin/bash
+# czekamy, az aplikacja sie zamknie, potem podmieniamy bundle i uruchamiamy na nowo
+for _ in $(seq 1 120); do
+  pgrep -f "{cel}/Contents/MacOS/" >/dev/null || break
+  sleep 0.5
+done
+ditto -x -k "{paczka}" "{tmp}/rozpakowane" || exit 1
+[ -d "{tmp}/rozpakowane/DEPOSKAN.app" ] || exit 1
+rm -rf "{cel}"
+ditto "{tmp}/rozpakowane/DEPOSKAN.app" "{cel}"
+
+# LaunchServices potrzebuje chwili, zeby zauwazyc podmieniony bundle
+sleep 1
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "{cel}" 2>/dev/null
+for _ in 1 2 3; do
+  open "{cel}" && sleep 3
+  pgrep -f "{cel}/Contents/MacOS/" >/dev/null && break
+  sleep 2
+done
+rm -rf "{tmp}"
+""")
+        os.chmod(skrypt, 0o755)
+        subprocess.Popen(['/bin/bash', skrypt], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        skrypt = os.path.join(tmp, 'podmien.ps1')
+        open(skrypt, 'w').write(f"""
+$stary = "{cel}"
+for ($i=0; $i -lt 120; $i++) {{
+  if (-not (Get-Process DEPOSKAN -ErrorAction SilentlyContinue)) {{ break }}
+  Start-Sleep -Milliseconds 500
+}}
+Copy-Item -Force "{paczka}" $stary
+Start-Process $stary
+Remove-Item -Recurse -Force "{tmp}"
+""")
+        subprocess.Popen(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                          '-File', skrypt], creationflags=0x00000008)
+
+    return {'ok': True, 'wersja': a['najnowsza']}
 
 
 def lista_modeli():
@@ -770,6 +887,11 @@ class H(http.server.BaseHTTPRequestHandler):
             return U
         if path == '/api/aktualizacja':
             return sprawdz_aktualizacje()
+        if path == '/api/zaktualizuj':
+            w = zaktualizuj()
+            if w.get('ok'):
+                threading.Timer(1.2, lambda: os._exit(0)).start()   # helper czeka na zamkniecie
+            return w
         if path == '/api/reset':
             if STAN['pracuje']:
                 return {'error': 'najpierw przerwij prace'}
@@ -1035,8 +1157,9 @@ button.zielony{background:
   <div class="modalKarta" style="max-width:430px; text-align:center">
     <div class="modalTyt" style="justify-content:center">Nowa wersja</div>
     <div class="aktTxt" id="aktTxt"></div>
-    <button class="zielony" id="aktPobierz">Pobierz</button>
-    <button class="ghost" onclick="$('modalAkt').classList.remove('on')">Pozniej</button>
+    <button class="zielony" id="aktPobierz">Zaktualizuj i uruchom ponownie</button>
+    <button class="ghost" id="aktPozniej"
+            onclick="$('modalAkt').classList.remove('on')">Pozniej</button>
   </div>
 </div>
 
@@ -1180,20 +1303,43 @@ function aktStart(){
     if (a.blad || !a.nowsza) return;
     $('aktTxt').innerHTML = 'Dostepna jest wersja <b>' + a.najnowsza +
       '</b>.<br>Masz zainstalowana ' + a.wersja + '.';
-    $('aktPobierz').onclick = () => { window.open(a.link, '_blank');
-                                      $('modalAkt').classList.remove('on'); };
+    $('aktPobierz').onclick = () => zaktualizuj(a);
     $('modalAkt').classList.add('on');
   });
 }
+// Pobiera nowe wydanie, podmienia aplikacje w miejscu i uruchamia ja ponownie.
+function zaktualizuj(a){
+  const b = $('aktPobierz');
+  b.disabled = true; $('aktPozniej').disabled = true;
+  b.textContent = 'Pobieram…';
+  $('aktTxt').innerHTML = 'Trwa pobieranie wersji <b>' + a.najnowsza +
+    '</b>. Aplikacja zamknie sie i otworzy ponownie sama.';
+  post('/api/zaktualizuj').then(w => {
+    if (w.error || !w.ok){
+      b.disabled = false; $('aktPozniej').disabled = false;
+      b.textContent = 'Zaktualizuj i uruchom ponownie';
+      $('aktTxt').textContent = w.error || w.info || 'nie udalo sie zaktualizowac';
+      return;
+    }
+    b.textContent = 'Podmieniam…';
+    $('aktTxt').innerHTML = 'Za chwile aplikacja uruchomi sie w wersji <b>' +
+      w.wersja + '</b>.';
+  }).catch(() => {   // serwer znika w trakcie podmiany — to normalne
+    b.textContent = 'Podmieniam…';
+  });
+}
+
 function akt(){
   $('uInfo').textContent = 'sprawdzam…';
   post('/api/aktualizacja').then(a => {
     if (a.blad){ $('uInfo').textContent = 'nie sprawdzilem: ' + a.blad; return; }
     if (a.nowsza){
-      $('powiad').innerHTML = 'Jest nowsza wersja: <b>' + a.najnowsza + '</b> (masz ' +
-        a.wersja + '). <a href="' + a.link + '" target="_blank">Pobierz</a>';
-      $('powiad').classList.add('on');
       $('uInfo').textContent = '';
+      $('aktTxt').innerHTML = 'Dostepna jest wersja <b>' + a.najnowsza +
+        '</b>.<br>Masz zainstalowana ' + a.wersja + '.';
+      $('aktPobierz').onclick = () => zaktualizuj(a);
+      ustZamknij();
+      $('modalAkt').classList.add('on');
     } else $('uInfo').textContent = 'masz najnowsza wersje (' + a.wersja + ')';
   });
 }

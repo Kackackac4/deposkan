@@ -19,6 +19,20 @@ Nic w toku.
 
 ---
 
+## [1.0.3] — 2026-09-08
+
+### Dodane
+
+- **Aktualizacja podmienia aplikację w miejscu.** Wcześniej przycisk otwierał stronę
+  z plikiem do ręcznego pobrania; teraz aplikacja sama pobiera nowe wydanie,
+  sprawdza jego sumę SHA-256, podmienia się na dysku i uruchamia ponownie —
+  bez udziału użytkownika.
+- Sprawdzenie sumy kontrolnej przed podmianą; niezgodność przerywa aktualizację.
+- Podmiany dokonuje osobny skrypt pomocniczy, który czeka na zamknięcie aplikacji
+  (program nie może nadpisać sam siebie w trakcie działania).
+
+---
+
 ## [1.0.2] — 2026-09-08
 
 ### Dodane
@@ -121,7 +135,8 @@ pliku źródłowego.
   do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
   zejść niżej.
 
-[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.2...HEAD
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.3
 [1.0.2]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.2
 [1.0.1]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.0
