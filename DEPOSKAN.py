@@ -1149,6 +1149,7 @@ function ustWczytaj(pokazJesliBrak){
       o.value = o.textContent = U.model; sel.appendChild(o);
     }
     sel.value = U.model;
+    if (U.ma_klucz) modele();           // odswiez liste modeli z konta
     if (pokazJesliBrak && !U.ma_klucz){
       $('powiad').textContent = 'Zeby zaczac, wklej klucz API z Google AI Studio ' +
         '(aistudio.google.com/apikey). Reszta ustawien jest juz gotowa.';
@@ -1165,7 +1166,7 @@ function ustZapisz(){
     model: $('uModel').value, na_req: +$('uNaReq').value,
     rpm: +$('uRpm').value}).then(U => {
     UST = U;
-    if (U.ma_klucz){ $('powiad').classList.remove('on'); ustZamknij(); }
+    if (U.ma_klucz){ modele(); $('powiad').classList.remove('on'); ustZamknij(); }
     else { $('powiad').textContent = 'Klucz jest pusty — bez niego nic nie odczytam.';
            $('powiad').classList.add('on'); }
   });
@@ -1194,19 +1195,22 @@ function akt(){
   });
 }
 
+// Aktualna lista modeli z konta — pobierana po cichu przy starcie.
+// To zapytanie o metadane, nie o generowanie, wiec nie zjada limitu odczytow.
 function modele(){
-  $('uInfo').textContent = 'pobieram…';
-  post('/api/modele').then(d => {
-    if (d.error) { $('uInfo').textContent = d.error; return; }
-    $('uInfo').textContent = '';
-    const s = $('uModel'), byl = s.value;
-    s.innerHTML = '';
-    (d.modele||[]).forEach(m => { const o = document.createElement('option');
-      o.value = o.textContent = m; s.appendChild(o); });
-    if ([...s.options].some(o => o.value === byl)) s.value = byl;
-    else { const f = [...s.options].find(o => /flash-lite/.test(o.value)); if (f) s.value = f.value; }
-    UST.model = s.value;
-  });
+  return post('/api/modele').then(d => {
+    if (d.error || !(d.modele||[]).length) return;      // bez klucza po prostu zostaje lista wbudowana
+    const sel = $('uModel'), byl = UST.model || sel.value;
+    sel.innerHTML = '';
+    d.modele.forEach(m => { const o = document.createElement('option');
+      o.value = o.textContent = m; sel.appendChild(o); });
+    const jest = w => [...sel.options].some(o => o.value === w);
+    sel.value = jest(byl) ? byl
+              : jest('gemini-3.5-flash-lite') ? 'gemini-3.5-flash-lite'
+              : ([...sel.options].find(o => /flash-lite/.test(o.value))
+                 || sel.options[0] || {value: ''}).value;
+    UST.model = sel.value;
+  }).catch(() => {});
 }
 
 function start(){
