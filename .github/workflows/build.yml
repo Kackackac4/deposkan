@@ -1,0 +1,79 @@
+name: Build
+
+# PyInstaller nie potrafi budowac "w poprzek" systemow — .exe musi powstac na Windows,
+# a .app na macOS. Dlatego jeden kod zrodlowy budujemy tutaj na dwoch maszynach naraz.
+# Odpalasz to tagiem:  git tag v1.0.1 && git push --tags
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:        # mozna tez odpalic recznie z zakladki Actions
+
+permissions:
+  contents: write           # potrzebne, zeby workflow mogl utworzyc Release
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            nazwa: macOS
+          - os: windows-latest
+            nazwa: Windows
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Zaleznosci
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller --noconfirm --windowed --name DEPOSKAN --icon ikona.icns \
+            --osx-bundle-identifier com.makroplast.deposkan \
+            --collect-all webview \
+            --hidden-import objc --hidden-import Foundation \
+            --hidden-import AppKit --hidden-import WebKit \
+            DEPOSKAN.py
+          cd dist && zip -qry DEPOSKAN-macOS.zip DEPOSKAN.app
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pyinstaller --noconfirm --windowed --onefile --name DEPOSKAN --icon ikona.ico `
+            --collect-all webview DEPOSKAN.py
+
+      - name: Zapisz wynik
+        uses: actions/upload-artifact@v4
+        with:
+          name: DEPOSKAN-${{ matrix.nazwa }}
+          path: |
+            dist/DEPOSKAN-macOS.zip
+            dist/DEPOSKAN.exe
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: pliki }
+
+      - name: Wydanie
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            pliki/**/DEPOSKAN-macOS.zip
+            pliki/**/DEPOSKAN.exe
+          generate_release_notes: true

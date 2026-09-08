@@ -1,0 +1,26 @@
+# środowisko i budowanie
+.venv/
+build/
+dist/
+__pycache__/
+*.spec
+*.pyc
+*.bak
+ikona.iconset/
+
+# gotowe aplikacje — buduje je GitHub Actions, nie trzymamy ich w repo
+DEPOSKAN.app/
+*.exe
+*.dmg
+*.zip
+
+# dane robocze i zdjęcia
+02.09.2026/
+wycinki/
+oryginaly_wg_kodu/
+app/
+*.JPG
+*.jpeg
+
+# system
+.DS_Store
