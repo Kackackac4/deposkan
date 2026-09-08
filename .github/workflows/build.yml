@@ -98,19 +98,30 @@ jobs:
             checksums.txt
           generate_release_notes: true
           body: |
-            ## Pobieranie
+            ## Instalacja
 
-            **macOS — zalecane, bez ostrzezen systemu.** Wklej w Terminal:
+            **Zalecane — bez ostrzezen systemu.**
+
+            macOS (Terminal):
 
             ```
             curl -fsSL https://raw.githubusercontent.com/Kackackac4/deposkan/main/instaluj-mac.sh | bash
             ```
 
-            **Windows** — `DEPOSKAN.exe` ponizej.
-            **macOS recznie** — `DEPOSKAN-macOS.zip` ponizej.
+            Windows (PowerShell):
 
-            Przy pierwszym uruchomieniu system pokaże ostrzeżenie, bo aplikacja nie ma
-            certyfikatu — instrukcja zatwierdzenia jest w [README](../../#macos-blokuje-pierwsze-uruchomienie).
+            ```
+            irm https://raw.githubusercontent.com/Kackackac4/deposkan/main/instaluj-win.ps1 | iex
+            ```
 
-            Pliki zbudował GitHub Actions z kodu w tym repozytorium; przebieg budowania
-            jest jawny. Sumy kontrolne SHA-256 w `checksums.txt`.
+            Ta sama komenda sluzy rowniez do aktualizacji.
+
+            **Recznie** — pliki ponizej dzialaja tak samo, ale przy pierwszym
+            uruchomieniu system pokaze jednorazowe ostrzezenie do zatwierdzenia
+            (aplikacja nie ma platnego certyfikatu). Instrukcja w
+            [README](https://github.com/Kackackac4/deposkan#uruchomienie).
+
+            ---
+
+            Pliki zbudowal GitHub Actions z kodu w tym repozytorium; przebieg
+            budowania jest jawny. Sumy kontrolne SHA-256 w `checksums.txt`.

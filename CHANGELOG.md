@@ -19,6 +19,29 @@ Nic w toku.
 
 ---
 
+## [1.0.2] — 2026-09-08
+
+### Dodane
+
+- **Instalatory jedną komendą dla macOS i Windows**, omijające ostrzeżenia systemu.
+  Etykietę, przez którą Gatekeeper i SmartScreen blokują aplikację (kwarantanna
+  na macOS, „Mark of the Web" na Windows), nakłada przeglądarka przy pobieraniu —
+  nie system. Plik pobrany z Terminala lub PowerShella jej nie dostaje, więc
+  aplikacja uruchamia się normalnie.
+  - macOS: `curl -fsSL .../instaluj-mac.sh | bash`
+  - Windows: `irm .../instaluj-win.ps1 | iex`
+  - Ta sama komenda służy do aktualizacji.
+  - Instalator Windows tworzy skróty w Menu Start i na pulpicie.
+- Składnia instalatora Windows jest sprawdzana przy każdym budowaniu na maszynie
+  Windows w GitHub Actions.
+
+### Uwagi
+
+- Pobranie plików wprost z Releases nadal działa tak samo — różnica polega tylko
+  na jednorazowym ostrzeżeniu, które trzeba wtedy zatwierdzić.
+
+---
+
 ## [1.0.1] — 2026-09-08
 
 ### Poprawione
@@ -98,6 +121,7 @@ pliku źródłowego.
   do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
   zejść niżej.
 
-[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.1...HEAD
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.2
 [1.0.1]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.0
