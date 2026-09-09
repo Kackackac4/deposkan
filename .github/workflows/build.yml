@@ -50,15 +50,32 @@ jobs:
           # ostrzezenia o niezweryfikowanym tworcy
           cd dist && ditto -c -k --sequesterRsrc --keepParent DEPOSKAN.app DEPOSKAN-macOS.zip
 
-      - name: Sprawdz skladnie instalatora Windows
+      - name: Sprawdz skrypty PowerShell
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $bledy = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            "$PWD/instaluj-win.ps1", [ref]$null, [ref]$bledy) | Out-Null
-          if ($bledy.Count) { $bledy | ForEach-Object { Write-Error $_.Message }; exit 1 }
-          Write-Host "instaluj-win.ps1 — skladnia poprawna"
+          function Sprawdz($nazwa, $tresc) {
+            $bledy = $null
+            [System.Management.Automation.Language.Parser]::ParseInput(
+              $tresc, [ref]$null, [ref]$bledy) | Out-Null
+            if ($bledy.Count) {
+              $bledy | ForEach-Object { Write-Error "$nazwa : $($_.Message)" }
+              exit 1
+            }
+            Write-Host "$nazwa - skladnia poprawna"
+          }
+
+          Sprawdz "instaluj-win.ps1" (Get-Content instaluj-win.ps1 -Raw)
+
+          # Skrypt podmiany przy aktualizacji jest szablonem w DEPOSKAN.py.
+          # Wyciagamy go i sprawdzamy tak samo — inaczej blad skladni wyszedlby
+          # dopiero u uzytkownika, w trakcie aktualizacji, i to po cichu.
+          $zrodlo = Get-Content DEPOSKAN.py -Raw
+          $wzor = 'SKRYPT_WIN = r' + [char]34 + [char]34 + [char]34 + '(.*?)' + [char]34 + [char]34 + [char]34
+          $m = [regex]::Match($zrodlo, $wzor, 'Singleline')
+          if (-not $m.Success) { Write-Error "nie znalazlem SKRYPT_WIN w DEPOSKAN.py"; exit 1 }
+          $szablon = $m.Groups[1].Value.Replace('@@LOG@@','C:\Temp\x.log').Replace('@@STARY@@','C:\Temp\DEPOSKAN.exe').Replace('@@NOWY@@','C:\Temp\nowy.exe').Replace('@@PID@@','1234')
+          Sprawdz "SKRYPT_WIN (podmiana przy aktualizacji)" $szablon
 
       - name: Build (Windows)
         if: runner.os == 'Windows'

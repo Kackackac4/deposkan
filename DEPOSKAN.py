@@ -30,7 +30,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.0.9'
+WERSJA = '1.1.0'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 
 # Domyslne ustawienia — uzytkownik zmienia je w oknie Ustawienia, zapisuja sie na dysk.
@@ -330,7 +330,7 @@ def sprawdz_aktualizacje():
 
 
 AKT = {'trwa': False, 'etap': '', 'procent': 0, 'mb': 0.0, 'mb_calosc': 0.0,
-       'blad': '', 'gotowe': False, 'wersja': ''}
+       'blad': '', 'gotowe': False, 'wersja': '', 'log': ''}
 
 
 def akt_stan(**co):
@@ -391,13 +391,75 @@ def pobierz_z_kontrola(url, cel, suma_url=None, nazwa=None):
     return h.hexdigest() == oczekiwana
 
 
+SKRYPT_WIN = r"""
+$ErrorActionPreference = "Stop"
+$log   = "@@LOG@@"
+$stary = "@@STARY@@"
+$nowy  = "@@NOWY@@"
+$stare_pid = @@PID@@
+
+function Zapisz($t) { "$(Get-Date -Format 'HH:mm:ss')  $t" | Out-File -FilePath $log -Append -Encoding utf8 }
+Zapisz "start; podmieniam $stary"
+
+# 1. czekamy, az aplikacja naprawde zniknie — najpierw po PID, potem po nazwie,
+#    bo PyInstaller w trybie onefile uruchamia proces potomny o tej samej nazwie
+try { Wait-Process -Id $stare_pid -Timeout 60 -ErrorAction SilentlyContinue } catch {}
+for ($i = 0; $i -lt 60; $i++) {
+    $zyje = Get-Process -Name DEPOSKAN -ErrorAction SilentlyContinue
+    if (-not $zyje) { break }
+    Start-Sleep -Milliseconds 500
+}
+Start-Sleep -Milliseconds 800
+Zapisz "aplikacja zamknieta"
+
+# 2. dzialajacego pliku .exe nie da sie nadpisac, ale MOZNA go przemianowac —
+#    dlatego najpierw odsuwamy stary na bok, dopiero potem kopiujemy nowy
+$odsuniety = "$stary.stary"
+if (Test-Path $odsuniety) { Remove-Item -LiteralPath $odsuniety -Force -ErrorAction SilentlyContinue }
+
+$udalo = $false
+for ($i = 0; $i -lt 40; $i++) {
+    try {
+        if (Test-Path $stary) { Move-Item -LiteralPath $stary -Destination $odsuniety -Force }
+        Copy-Item -LiteralPath $nowy -Destination $stary -Force
+        $udalo = $true
+        break
+    } catch {
+        Zapisz "proba $($i+1): $($_.Exception.Message)"
+        # gdy kopiowanie padlo po przemianowaniu, wracamy do stanu wyjsciowego
+        if ((Test-Path $odsuniety) -and -not (Test-Path $stary)) {
+            Move-Item -LiteralPath $odsuniety -Destination $stary -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Seconds 1
+    }
+}
+
+if (-not $udalo) {
+    Zapisz "NIE UDALO SIE podmienic pliku"
+    if ((Test-Path $odsuniety) -and -not (Test-Path $stary)) {
+        Move-Item -LiteralPath $odsuniety -Destination $stary -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path $stary) { Start-Process -FilePath $stary }
+    exit 1
+}
+
+Zapisz "podmieniono, uruchamiam"
+Start-Process -FilePath $stary
+Start-Sleep -Seconds 3
+Remove-Item -LiteralPath $odsuniety -Force -ErrorAction SilentlyContinue
+Zapisz "gotowe"
+"""
+
+
 def zaktualizuj_w_tle():
     """Cala aktualizacja w osobnym watku — interfejs odpytuje o postep."""
     try:
         w = zaktualizuj()
         if w.get('ok'):
             akt_stan(etap='uruchamiam ponownie', gotowe=True, wersja=w['wersja'], trwa=False)
-            threading.Timer(1.5, lambda: os._exit(0)).start()
+            # na Windows proces potomny PyInstallera potrzebuje chwili wiecej
+            threading.Timer(2.5 if sys.platform == 'win32' else 1.5,
+                            lambda: os._exit(0)).start()
         else:
             akt_stan(etap='', blad=w.get('info', 'nie udało się'), trwa=False)
     except Exception as e:
@@ -452,19 +514,20 @@ rm -rf "{tmp}"
         subprocess.Popen(['/bin/bash', skrypt], start_new_session=True,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
-        skrypt = os.path.join(tmp, 'podmien.ps1')
-        open(skrypt, 'w').write(f"""
-$stary = "{cel}"
-for ($i=0; $i -lt 120; $i++) {{
-  if (-not (Get-Process DEPOSKAN -ErrorAction SilentlyContinue)) {{ break }}
-  Start-Sleep -Milliseconds 500
-}}
-Copy-Item -Force "{paczka}" $stary
-Start-Process $stary
-Remove-Item -Recurse -Force "{tmp}"
-""")
+        # skrypt kladziemy POZA katalogiem tymczasowym pobrania — poprzednia wersja
+        # kasowala katalog, w ktorym sama sie wykonywala
+        skrypt = os.path.join(tempfile.gettempdir(), 'deposkan-podmien.ps1')
+        log = os.path.join(tempfile.gettempdir(), 'deposkan-aktualizacja.log')
+        tresc = (SKRYPT_WIN.replace('@@LOG@@', log)
+                           .replace('@@STARY@@', cel)
+                           .replace('@@NOWY@@', paczka)
+                           .replace('@@PID@@', str(os.getpid())))
+        with open(skrypt, 'w', encoding='utf-8') as f:
+            f.write(tresc)
+        akt_stan(log=log)
         subprocess.Popen(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-                          '-File', skrypt], creationflags=0x00000008)
+                          '-WindowStyle', 'Hidden', '-File', skrypt],
+                         creationflags=0x00000008 | 0x00000200)   # odlaczony, wlasna grupa
 
     return {'ok': True, 'wersja': a['najnowsza']}
 
@@ -1127,7 +1190,8 @@ button.ghost::before{display:none}
   background:var(--card); border:1px solid var(--stroke); border-radius:24px; padding:24px;
   backdrop-filter:blur(40px) saturate(180%);
   box-shadow:0 28px 70px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.4)}
-.aktTxt{font-size:14.5px; line-height:1.55; color:var(--dim); margin-bottom:18px}
+.aktTxt{font-size:14.5px; line-height:1.55; color:var(--dim); margin-bottom:18px;
+  white-space:pre-wrap; word-break:break-word}
 .aktInfo{display:flex; justify-content:space-between; font-size:12px; color:var(--dim);
   margin-top:7px; margin-bottom:16px; font-variant-numeric:tabular-nums}
 .aktTxt b{color:var(--txt)}
@@ -1399,7 +1463,11 @@ function sledzAkt(){
   let podmieniano = false;
   const tik = setInterval(() => {
     post('/api/stan_akt').then(A => {
-      if (A.blad){ clearInterval(tik); aktBlad(A.blad); return; }
+      if (A.blad){
+        clearInterval(tik);
+        aktBlad(A.blad + (A.log ? '\n\nSzczegóły: ' + A.log : ''));
+        return;
+      }
       if (A.etap === 'podmieniam aplikację' || A.gotowe) podmieniano = true;
       $('aktFill').style.width = (A.procent || 0) + '%';
       $('aktEtap').textContent = A.etap || '';

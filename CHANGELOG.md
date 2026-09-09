@@ -19,6 +19,34 @@ Nic w toku.
 
 ---
 
+## [1.1.0] — 2026-09-09
+
+### Poprawione
+
+- **Aktualizacja na Windows nie podmieniała pliku.** Pobranie i weryfikacja działały,
+  ale sama podmiana cicho zawodziła i po restarcie wracała stara wersja. Trzy przyczyny:
+  - **Nie da się nadpisać działającego pliku `.exe`.** Skrypt czekał na zamknięcie
+    aplikacji tylko po nazwie procesu, a PyInstaller w trybie onefile uruchamia proces
+    potomny o tej samej nazwie. Gdy czekanie się nie powiodło, `Copy-Item` padał
+    **bez żadnego komunikatu** i uruchamiana była stara wersja.
+    Teraz podmiana idzie przez zmianę nazwy — działający plik da się przemianować,
+    choć nie da się go nadpisać — z ponawianiem przez 40 sekund i przywróceniem
+    stanu wyjściowego, gdyby kopiowanie zawiodło.
+  - Skrypt kasował katalog tymczasowy, **w którym sam się wykonywał**. Teraz leży
+    poza nim.
+  - Brak jakiegokolwiek logu. Teraz zapisuje przebieg do
+    `%TEMP%\deposkan-aktualizacja.log`, a ścieżka pokazuje się w oknie przy błędzie.
+- Aplikacja czeka na zamknięcie po numerze procesu, nie tylko po nazwie, i daje
+  systemowi Windows więcej czasu na zwolnienie pliku.
+
+### Dodane
+
+- Składnia skryptu podmiany jest sprawdzana przy każdym budowaniu na maszynie Windows.
+  Wcześniej sprawdzany był tylko instalator, więc błąd w skrypcie aktualizacji wyszedłby
+  dopiero u użytkownika.
+
+---
+
 ## [1.0.9] — 2026-09-08
 
 ### Poprawione
@@ -215,7 +243,8 @@ pliku źródłowego.
   do zdjęcia. Domyślne 25 to kompromis pod limit dobowy; przy zapasie limitu warto
   zejść niżej.
 
-[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.0.9...HEAD
+[Niewydane]: https://github.com/Kackackac4/deposkan/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Kackackac4/deposkan/releases/tag/v1.1.0
 [1.0.9]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.9
 [1.0.8]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.8
 [1.0.7]: https://github.com/Kackackac4/deposkan/releases/tag/v1.0.7
