@@ -36,7 +36,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.2.2'
+WERSJA = '1.3.0'
 NAZWA  = 'MakroSkan'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 # Pliki wydania (DEPOSKAN.exe, DEPOSKAN-macOS.zip) i katalog ustawien zostaja pod stara
@@ -408,64 +408,99 @@ def pobierz_z_kontrola(url, cel, suma_url=None, nazwa=None):
     return h.hexdigest() == oczekiwana
 
 
-SKRYPT_WIN = r"""
-$ErrorActionPreference = "Stop"
-$log   = "@@LOG@@"
-$stary = "@@STARY@@"
-$nowy  = "@@NOWY@@"
-$stare_pid = @@PID@@
+# ── podmiana na Windows ──────────────────────────────────────────────────
+# Bez PowerShella. Poprzednia wersja (skrypt .ps1) zawodziła u uzytkownikow: aplikacja
+# zamykala sie i nie wstawala, a ikona uruchamiala stara wersje. Dwie przyczyny:
+#  - skrypt dziedziczyl zmienne srodowiskowe dzialajacej aplikacji (_PYI_*), a nowy
+#    DEPOSKAN.exe uruchomiony z takimi zmiennymi uznaje sie za proces potomny starego
+#    i szuka jego katalogu tymczasowego (_MEI...), ktorego juz nie ma — nie startuje,
+#  - bledy PowerShella (polityka wykonywania skryptow w firmie, kodowanie sciezek)
+#    ginely bez sladu.
+# Teraz podmiane robi SAMA NOWA WERSJA: pobiera sie obok jako DEPOSKAN.exe.new i jest
+# uruchamiana z czystym srodowiskiem i argumentem --podmien.
+LOG_AKT = os.path.join(tempfile.gettempdir(), 'deposkan-aktualizacja.log')
 
-function Zapisz($t) { "$(Get-Date -Format 'HH:mm:ss')  $t" | Out-File -FilePath $log -Append -Encoding utf8 }
-Zapisz "start; podmieniam $stary"
 
-# 1. czekamy, az aplikacja naprawde zniknie — najpierw po PID, potem po nazwie,
-#    bo PyInstaller w trybie onefile uruchamia proces potomny o tej samej nazwie
-try { Wait-Process -Id $stare_pid -Timeout 60 -ErrorAction SilentlyContinue } catch {}
-for ($i = 0; $i -lt 60; $i++) {
-    $zyje = Get-Process -Name DEPOSKAN -ErrorAction SilentlyContinue
-    if (-not $zyje) { break }
-    Start-Sleep -Milliseconds 500
-}
-Start-Sleep -Milliseconds 800
-Zapisz "aplikacja zamknieta"
+def log_akt(t):
+    try:
+        with open(LOG_AKT, 'a', encoding='utf-8') as f:
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S")}  {t}\n')
+    except OSError:
+        pass
 
-# 2. dzialajacego pliku .exe nie da sie nadpisac, ale MOZNA go przemianowac —
-#    dlatego najpierw odsuwamy stary na bok, dopiero potem kopiujemy nowy
-$odsuniety = "$stary.stary"
-if (Test-Path $odsuniety) { Remove-Item -LiteralPath $odsuniety -Force -ErrorAction SilentlyContinue }
 
-$udalo = $false
-for ($i = 0; $i -lt 40; $i++) {
-    try {
-        if (Test-Path $stary) { Move-Item -LiteralPath $stary -Destination $odsuniety -Force }
-        Copy-Item -LiteralPath $nowy -Destination $stary -Force
-        $udalo = $true
-        break
-    } catch {
-        Zapisz "proba $($i+1): $($_.Exception.Message)"
-        # gdy kopiowanie padlo po przemianowaniu, wracamy do stanu wyjsciowego
-        if ((Test-Path $odsuniety) -and -not (Test-Path $stary)) {
-            Move-Item -LiteralPath $odsuniety -Destination $stary -Force -ErrorAction SilentlyContinue
-        }
-        Start-Sleep -Seconds 1
-    }
-}
+def czyste_srodowisko():
+    """Srodowisko dla nowo uruchamianego DEPOSKAN.exe — bez sladow biezacego procesu
+    PyInstallera. PYINSTALLER_RESET_ENVIRONMENT kaze bootloaderowi (6.9+) wystartowac
+    jako zupelnie nowa aplikacja."""
+    env = {k: v for k, v in os.environ.items()
+           if not k.upper().startswith(('_PYI', '_MEI', 'PYINSTALLER'))}
+    env['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+    return env
 
-if (-not $udalo) {
-    Zapisz "NIE UDALO SIE podmienic pliku"
-    if ((Test-Path $odsuniety) -and -not (Test-Path $stary)) {
-        Move-Item -LiteralPath $odsuniety -Destination $stary -Force -ErrorAction SilentlyContinue
-    }
-    if (Test-Path $stary) { Start-Process -FilePath $stary }
-    exit 1
-}
 
-Zapisz "podmieniono, uruchamiam"
-Start-Process -FilePath $stary
-Start-Sleep -Seconds 3
-Remove-Item -LiteralPath $odsuniety -Force -ErrorAction SilentlyContinue
-Zapisz "gotowe"
-"""
+def uruchom_odlaczony(exe, *argi):
+    subprocess.Popen([exe, *argi], env=czyste_srodowisko(), cwd=os.path.dirname(exe),
+                     close_fds=True, creationflags=0x00000008 | 0x00000200)  # odlaczony, wlasna grupa
+
+
+def czekaj_na_proces(pid, sekundy):
+    """Windows: czeka, az proces o danym PID sie zakonczy."""
+    import ctypes
+    k32 = ctypes.windll.kernel32
+    h = k32.OpenProcess(0x00100000, False, int(pid))        # SYNCHRONIZE
+    if not h:
+        return                                               # juz go nie ma
+    k32.WaitForSingleObject(h, int(sekundy * 1000))
+    k32.CloseHandle(h)
+
+
+def podmien_windows(cel, pid):
+    """Uruchamiane z NOWEGO pliku (DEPOSKAN.exe.new --podmien <cel> <pid>).
+    Czeka na zamkniecie starej wersji, kopiuje sie w jej miejsce i ja uruchamia."""
+    nowy = os.path.abspath(sys.executable)
+    log_akt(f'podmiana {WERSJA}: {nowy} -> {cel}, czekam na zamknięcie PID {pid}')
+    czekaj_na_proces(pid, 60)
+    # plik trzyma jeszcze proces nadrzedny PyInstallera (sprzata katalog tymczasowy),
+    # a chwile potem potrafi go przytrzymac antywirus — dlatego ponawiamy do 60 s
+    tmp = cel + '.tmp'
+    for proba in range(1, 121):
+        try:
+            shutil.copyfile(nowy, tmp)
+            os.replace(tmp, cel)                  # atomowo: albo stary, albo caly nowy
+            log_akt(f'podmieniono (próba {proba})')
+            break
+        except OSError as e:
+            if proba in (1, 10, 40, 80, 120):
+                log_akt(f'próba {proba}: {e}')
+            time.sleep(0.5)
+    else:
+        log_akt('NIE UDAŁO SIĘ podmienić pliku — uruchamiam dotychczasową wersję')
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    try:
+        uruchom_odlaczony(cel)
+        log_akt(f'uruchomiono {cel}')
+    except Exception as e:
+        log_akt(f'nie udało się uruchomić {cel}: {e}')
+
+
+def sprzatnij_po_aktualizacji():
+    """Przy starcie: resztki po podmianie (.new, .tmp, .stary z wersji z PowerShellem)."""
+    cel = sciezka_aplikacji()
+    if not cel or sys.platform != 'win32':
+        return
+    for dopisek in ('.new', '.tmp', '.stary'):
+        p = cel + dopisek
+        for _ in range(10):                       # .new moze jeszcze konczyc prace
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+                break
+            except OSError:
+                time.sleep(1)
 
 
 def zaktualizuj_w_tle():
@@ -534,20 +569,17 @@ rm -rf "{tmp}"
         subprocess.Popen(['/bin/bash', skrypt], start_new_session=True,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
-        # skrypt kladziemy POZA katalogiem tymczasowym pobrania — poprzednia wersja
-        # kasowala katalog, w ktorym sama sie wykonywala
-        skrypt = os.path.join(tempfile.gettempdir(), 'deposkan-podmien.ps1')
-        log = os.path.join(tempfile.gettempdir(), 'deposkan-aktualizacja.log')
-        tresc = (SKRYPT_WIN.replace('@@LOG@@', log)
-                           .replace('@@STARY@@', cel)
-                           .replace('@@NOWY@@', paczka)
-                           .replace('@@PID@@', str(os.getpid())))
-        with open(skrypt, 'w', encoding='utf-8') as f:
-            f.write(tresc)
-        akt_stan(log=log)
-        subprocess.Popen(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-                          '-WindowStyle', 'Hidden', '-File', skrypt],
-                         creationflags=0x00000008 | 0x00000200)   # odlaczony, wlasna grupa
+        # nowa wersja laduje obok zainstalowanej i sama robi podmiane (podmien_windows)
+        nowy = cel + '.new'
+        try:
+            shutil.copyfile(paczka, nowy)
+        except OSError:                          # katalog tylko do odczytu — zostajemy w TEMP
+            nowy = paczka
+        if nowy != paczka:
+            shutil.rmtree(tmp, ignore_errors=True)
+        log_akt(f'aktualizacja {WERSJA} -> {a["najnowsza"]}: uruchamiam {nowy} --podmien')
+        akt_stan(log=LOG_AKT)
+        uruchom_odlaczony(nowy, '--podmien', cel, str(os.getpid()))
 
     return {'ok': True, 'wersja': a['najnowsza']}
 
@@ -1145,6 +1177,11 @@ Zasady:
   co do znaku — pewnosc "niska".
 - Jesli na zdjeciu sa ROZNE profile: w "produkt" najlepiej widoczny, pozostale (z listy)
   w "inne". Gdy profil jest jeden — "inne" puste.
+- "pakowane": czesc profili wystepuje w wersji PAKOWANEJ (na liscie z dopiskiem "pak").
+  Wtedy na zdjeciu nie ma jednej dlugiej listwy, tylko kosz albo stos wielu mniejszych
+  paczek listew, a na nich WIELE MALYCH, IDENTYCZNYCH ETYKIET z tym samym oznaczeniem.
+  Jesli tak jest — "pakowane": true i w "produkt" wybierz wariant z dopiskiem "pak".
+  Jedna etykieta na jednej listwie/paczce — "pakowane": false.
 - "folia": true, jesli na zdjeciu widac dopisek o FOLII OCHRONNEJ — napis "folia ochronna",
   "folia", albo osobna litere "F" / "F." dopisana przy oznaczeniu profilu. Litera F bedaca
   czescia oznaczenia z listy (np. "KF.") sie nie liczy. W przeciwnym razie false.
@@ -1169,8 +1206,9 @@ def schemat_alu(profile):
                 'pewnosc': {'type': 'STRING', 'enum': ['wysoka', 'niska']},
                 'inne':    {'type': 'ARRAY', 'items': {'type': 'STRING'}},
                 'folia':   {'type': 'BOOLEAN'},
+                'pakowane': {'type': 'BOOLEAN'},
             },
-            'required': ['nr', 'produkt', 'napis', 'pewnosc', 'inne', 'folia'],
+            'required': ['nr', 'produkt', 'napis', 'pewnosc', 'inne', 'folia', 'pakowane'],
         }}},
         'required': ['wyniki'],
     }
@@ -1193,6 +1231,17 @@ def gemini(prompt, jpgi, model, schemat, rodzaj='alu'):
     return json.loads(tekst).get('wyniki', [])
 
 
+def mapa_pak(profile):
+    """Profil bez dopisku -> jego wariant "pak" z listy, np. "PSB 170/02." -> "PSB 170/02 pak".
+    Porownanie po normie (bez spacji i kropek). Warianty z "F." nie maja tu odpowiednika."""
+    out = {}
+    for p in profile:
+        m = re.match(r'^(.*?)\s*pak\.?$', p, re.I)
+        if m:
+            out.setdefault(norm_profilu(m.group(1)), p)
+    return out
+
+
 def czytaj_alu(jpgi, model, profile, wstep, rodzaj='alu'):
     """Zwraca liste slownikow {produkt, napis, pewnosc, inne} w kolejnosci obrazow."""
     prompt = (PROMPT_ALU.replace('@@WSTEP@@', wstep)
@@ -1201,6 +1250,7 @@ def czytaj_alu(jpgi, model, profile, wstep, rodzaj='alu'):
     po_normie = {}
     for p in profile:
         po_normie.setdefault(norm_profilu(p), p)
+    pak = mapa_pak(profile)
 
     out = [{'produkt': '', 'napis': '', 'status': 'brak', 'inne': []} for _ in jpgi]
     for w in wyniki:
@@ -1213,6 +1263,11 @@ def czytaj_alu(jpgi, model, profile, wstep, rodzaj='alu'):
         # dlatego i tak sprawdzamy po normie, a w drugiej kolejnosci po samym napisie
         prod = po_normie.get(norm_profilu(w.get('produkt'))) or \
                (po_normie.get(norm_profilu(napis)) if napis else None)
+        pakowane = bool(w.get('pakowane'))
+        # wiele identycznych etykiet = wersja pakowana; gdy model to zauwazyl, a wybral
+        # wariant bez "pak", a na liscie jest wariant "pak" — bierzemy wariant "pak"
+        if prod and pakowane and not re.search(r'\bpak\.?$', prod, re.I):
+            prod = pak.get(norm_profilu(prod), prod)
         inne = [po_normie.get(norm_profilu(x)) for x in (w.get('inne') or [])]
         inne = [x for x in dict.fromkeys(inne) if x and x != prod][:3]
         if prod:
@@ -1222,7 +1277,7 @@ def czytaj_alu(jpgi, model, profile, wstep, rodzaj='alu'):
         else:
             status = 'brak'
         out[i] = {'produkt': prod or '', 'napis': napis, 'status': status, 'inne': inne,
-                  'folia': bool(w.get('folia'))}
+                  'folia': bool(w.get('folia')), 'pakowane': pakowane}
     return out
 
 
@@ -1395,6 +1450,7 @@ def raport_alu(folder, cel_dir, wyniki, produkty):
     L += ['', 'ZDJĘCIA', '']
     for w in wyniki:
         L.append(f'  [{etyk[w["status"]]}]  {w["stary"]}  ->  {w["nowy"]}'
+                 + ('   [pakowane — wiele etykiet]' if w.get('pakowane') else '')
                  + (f'   (napis: {w["napis"]})' if w.get('napis') else ''))
     with open(os.path.join(cel_dir, f'Raport {NAZWA}.txt'), 'w', encoding='utf-8') as f:
         f.write('\n'.join(L) + '\n')
@@ -1627,7 +1683,8 @@ def przebieg_alu(folder, model, na_req, rpm):
                     shutil.copy2(p, cel)    # kopia 1:1, oryginal nietkniety
                 wyniki.append({'stary': k, 'nowy': os.path.basename(cel), 'status': w['status'],
                                'kod': ' + '.join(produkty_wyniku(w)),
-                               'napis': w.get('napis', '')})
+                               'napis': w.get('napis', ''),
+                               'pakowane': bool(w.get('pakowane'))})
             except Exception as e:
                 log(f'nie udało się {k}: {e}')
 
@@ -1644,6 +1701,10 @@ def przebieg_alu(folder, model, na_req, rpm):
         produkty = sorted(zest.values(), key=lambda z: (-z['ile'], kolej.get(z['produkt'], 1e9)))
         try:
             raport_alu(folder, cel_dir, wyniki, produkty)
+            # od razu na ekran: karteczka z podsumowaniem i pelny raport
+            if wyniki:
+                for plik in (f'Raport {NAZWA}.png', f'Raport {NAZWA}.txt'):
+                    otworz_plik(os.path.join(cel_dir, plik))
         except Exception as e:
             log(f'raport nie zapisany: {e}')
 
@@ -1732,6 +1793,21 @@ def z_findera():
         'set r to ""\nrepeat with i in l\n  set r to r & POSIX path of i & linefeed\n'
         'end repeat\nreturn r')
     return rozwin([x for x in out.split('\n') if x.strip()])
+
+
+def otworz_plik(p):
+    """Otwiera plik w domyslnym programie systemu (podglad zdjec, Notatnik / TextEdit)."""
+    if not os.path.exists(p):
+        return
+    try:
+        if sys.platform == 'win32':
+            os.startfile(p)                            # noqa
+        elif sys.platform == 'darwin':
+            subprocess.Popen(['open', p])
+        else:
+            subprocess.Popen(['xdg-open', p])
+    except Exception as e:
+        log(f'nie otworzyłem {os.path.basename(p)}: {e}')
 
 
 def pokaz_folder(f):
@@ -2719,17 +2795,33 @@ def wolny_port():
         try:
             s = http.server.ThreadingHTTPServer(('127.0.0.1', p), H)
         except OSError:
-            try:                                  # zajety przez nasza wczesniejsza instancje?
-                with socket.create_connection(('127.0.0.1', p), timeout=.4):
+            # zajety przez nasza wczesniejsza instancje? Podlaczamy sie do niej TYLKO gdy to
+            # ta sama wersja — inaczej po aktualizacji okno pokazaloby stary interfejs
+            # z procesu, ktory jeszcze sie nie zamknal
+            try:
+                d = http_json(f'http://127.0.0.1:{p}/api/ustawienia', {}, timeout=2)
+                if d.get('wersja') == WERSJA:
                     return p
-            except OSError:
-                continue
+            except Exception:
+                pass
+            continue
         threading.Thread(target=s.serve_forever, daemon=True).start()
         return p
     raise RuntimeError('brak wolnego portu')
 
 
 def main():
+    # nowa wersja uruchomiona przez aktualizacje: tylko podmiana pliku, bez okna
+    if len(sys.argv) >= 4 and sys.argv[1] == '--podmien':
+        podmien_windows(sys.argv[2], sys.argv[3])
+        return
+    threading.Thread(target=sprzatnij_po_aktualizacji, daemon=True).start()
+    if os.environ.get('MAKROSKAN_TEST'):
+        # test podmiany w GitHub Actions: dowod, ze uruchomiona po podmianie wersja
+        # naprawde wystartowala (bez okna, ktorego na maszynie budujacej nie ma)
+        log_akt(f'start testowy {WERSJA}: {sys.executable}')
+        time.sleep(20)
+        return
     d = cfg_wczytaj()
     if not d.get('mig_alu30'):
         # 1.2.0 zapisywala 10 zdjec ALUPROF w zapytaniu; od 1.2.1 domyslnie 30

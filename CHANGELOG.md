@@ -19,6 +19,35 @@ Nic w toku.
 
 ---
 
+## [1.3.0] — 2026-09-21
+
+### Poprawione
+
+- **Aktualizacja na Windows — nowy mechanizm, bez PowerShella.** Poprzedni zamykał
+  aplikację, która już nie wstawała, a ikona uruchamiała starą wersję. Przyczyny:
+  skrypt przekazywał nowej wersji zmienne środowiskowe działającej aplikacji (`_PYI_*`),
+  przez co nowy `DEPOSKAN.exe` uznawał się za proces potomny starego i szukał jego
+  nieistniejącego już katalogu tymczasowego; błędy PowerShella (polityka skryptów,
+  kodowanie ścieżek) ginęły bez śladu.
+  Teraz nowa wersja pobiera się obok jako `DEPOSKAN.exe.new`, startuje z czystym
+  środowiskiem, czeka na zamknięcie starej, podmienia plik (z ponawianiem, gdy trzyma go
+  antywirus) i uruchamia aplikację. Przebieg w `%TEMP%\deposkan-aktualizacja.log`.
+  **Podmiana jest testowana przy każdym budowaniu na prawdziwym Windowsie.**
+- Po aktualizacji okno nie podłącza się już do serwera starej, jeszcze niezamkniętej
+  wersji (wcześniej mogło pokazać stary interfejs).
+
+> Wersje 1.1.0–1.2.2 mają jeszcze stary mechanizm — na Windows trzeba **jeden raz**
+> zainstalować 1.3.0 komendą z README. Kolejne aktualizacje zadziałają już z aplikacji.
+
+### Dodane
+
+- **ALUPROF: wersje pakowane.** Gdy na zdjęciu jest kosz wielu małych paczek z wieloma
+  identycznymi etykietami, a profil ma na liście wariant „pak”, zdjęcie dostaje nazwę
+  z „pak” (`PSB 170-02 pak.jpg`), a raport oznacza je „[pakowane — wiele etykiet]”.
+- **Po zakończeniu skanowania ALUPROF** karteczka `Raport MakroSkan.png` i pełny raport
+  `Raport MakroSkan.txt` otwierają się same.
+
+
 ## [1.2.2] — 2026-09-21
 
 ### Dodane

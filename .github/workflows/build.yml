@@ -76,21 +76,44 @@ jobs:
 
           Sprawdz "instaluj-win.ps1" (Get-Content instaluj-win.ps1 -Raw)
 
-          # Skrypt podmiany przy aktualizacji jest szablonem w DEPOSKAN.py.
-          # Wyciagamy go i sprawdzamy tak samo — inaczej blad skladni wyszedlby
-          # dopiero u uzytkownika, w trakcie aktualizacji, i to po cichu.
-          $zrodlo = Get-Content DEPOSKAN.py -Raw
-          $wzor = 'SKRYPT_WIN = r' + [char]34 + [char]34 + [char]34 + '(.*?)' + [char]34 + [char]34 + [char]34
-          $m = [regex]::Match($zrodlo, $wzor, 'Singleline')
-          if (-not $m.Success) { Write-Error "nie znalazlem SKRYPT_WIN w DEPOSKAN.py"; exit 1 }
-          $szablon = $m.Groups[1].Value.Replace('@@LOG@@','C:\Temp\x.log').Replace('@@STARY@@','C:\Temp\DEPOSKAN.exe').Replace('@@NOWY@@','C:\Temp\nowy.exe').Replace('@@PID@@','1234')
-          Sprawdz "SKRYPT_WIN (podmiana przy aktualizacji)" $szablon
-
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |
           pyinstaller --noconfirm --windowed --onefile --name DEPOSKAN --icon ikona.ico `
             --collect-all webview DEPOSKAN.py
+
+      # Prawdziwa podmiana na prawdziwym Windowsie, zanim wydanie trafi do ludzi:
+      # "stara wersja" to kopia PING.EXE, ktora dziala 5 s i trzyma plik (jak otwarta
+      # aplikacja). Nowy DEPOSKAN.exe.new --podmien musi poczekac, podmienic plik
+      # i uruchomic go — a uruchomiona wersja zapisuje w logu "start testowy".
+      - name: Test podmiany przy aktualizacji (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          MAKROSKAN_TEST: '1'
+        run: |
+          $d   = Join-Path $env:RUNNER_TEMP 'akt ząb'          # spacja i polski znak w sciezce
+          New-Item -ItemType Directory -Force $d | Out-Null
+          $cel = Join-Path $d 'DEPOSKAN.exe'
+          $log = Join-Path $env:TEMP 'deposkan-aktualizacja.log'
+          Remove-Item $log -ErrorAction SilentlyContinue
+          Copy-Item C:\Windows\System32\PING.EXE $cel
+          Copy-Item dist\DEPOSKAN.exe "$cel.new"
+          $stary = Start-Process -FilePath $cel -ArgumentList '-n','6','127.0.0.1' -PassThru -WindowStyle Hidden
+          # .new sam jest procesem PyInstallera (ma zmienne _PYI_*) i uruchamia wlasciwa
+          # aplikacje — dokladnie to psulo stary mechanizm; tu musi zadzialac
+          Start-Process -FilePath "$cel.new" -ArgumentList '--podmien',"`"$cel`"",$stary.Id
+          $wzor = (Get-FileHash dist\DEPOSKAN.exe).Hash
+          for ($i = 0; $i -lt 90; $i++) {
+            Start-Sleep 1
+            $ok = (Test-Path $log) -and (Select-String -Path $log -Pattern 'start testowy' -Quiet)
+            if ($ok) { break }
+          }
+          Write-Host "--- log aktualizacji:"; Get-Content $log -ErrorAction SilentlyContinue
+          if ((Get-FileHash $cel).Hash -ne $wzor) { Write-Error 'plik NIE zostal podmieniony'; exit 1 }
+          if (-not $ok) { Write-Error 'podmieniona wersja NIE wystartowala'; exit 1 }
+          Write-Host 'podmiana i ponowne uruchomienie: OK'
+          Get-Process DEPOSKAN -ErrorAction SilentlyContinue | Stop-Process -Force
 
       - name: Zapisz wynik
         uses: actions/upload-artifact@v4
