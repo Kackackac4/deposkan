@@ -28,7 +28,7 @@ leca paczkami (kilka obrazow w jednym requescie), a postep zapisuje sie na dysk 
 gdy limit sie skonczy, nastepnego dnia program dokonczy od miejsca przerwania.
 """
 import base64, http.server, json, os, re, shutil, socket, subprocess, sys, tempfile
-import threading, time, urllib.error, urllib.request, zipfile
+import collections, threading, time, urllib.error, urllib.request, zipfile
 
 import cv2
 import numpy as np
@@ -36,7 +36,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.2.1'
+WERSJA = '1.2.2'
 NAZWA  = 'MakroSkan'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 # Pliki wydania (DEPOSKAN.exe, DEPOSKAN-macOS.zip) i katalog ustawien zostaja pod stara
@@ -49,6 +49,7 @@ DOMYSLNE = {
     'model':  'gemini-3.5-flash-lite',
     'na_req': 25,                      # kadrow w jednym zapytaniu
     'rpm':    15,                      # zapytan na minute
+    'tpm':    250000,                  # tokenow wejscia na minute (limit z AI Studio)
     'tryb':   'depo',                  # 'depo' albo 'alu' — ostatnio wybrany przelacznik
     'na_req_alu': 30,                  # calych zdjec ALUPROF w jednym zapytaniu
     'profile': '',                     # wlasna lista profili ALUPROF; pusta = PROFILE_ALUPROF
@@ -577,7 +578,60 @@ def orig_do_jpg(sciezka, dl_boku=1500, jakosc=86):
     return buf.tobytes() if ok else None
 
 
-def czytaj_paczke(jpgi, model, prompt=None):
+class Tokeny:
+    """Limit tokenow na minute (TPM). Pamieta, ile tokenow wejscia zuzyly zapytania
+    z ostatnich 60 s (prawdziwe liczby z odpowiedzi API) i wstrzymuje kolejne zapytanie,
+    dopoki sie nie zmiesci. Liczbe tokenow na obraz uczy sie z odpowiedzi."""
+    ZAPAS = 0.8                          # celujemy w 80% limitu — szacunek bywa za niski
+
+    def __init__(self):
+        self.okno = collections.deque()  # (czas, tokeny)
+        self.na_obraz = {}               # rodzaj obrazu -> tokenow na sztuke
+        self.lock = threading.Lock()
+
+    def limit(self):
+        return max(10000, int(cfg_wczytaj().get('tpm') or 250000)) * self.ZAPAS
+
+    def suma(self):
+        with self.lock:
+            while self.okno and time.time() - self.okno[0][0] > 60:
+                self.okno.popleft()
+            return sum(t for _, t in self.okno)
+
+    def szacuj(self, obrazy, rodzaj):
+        return 2500 + obrazy * self.na_obraz.get(rodzaj, 1500)
+
+    def dodaj(self, tokeny, obrazy=0, rodzaj=''):
+        with self.lock:
+            self.okno.append((time.time(), tokeny))
+            if obrazy and tokeny > 2500:
+                self.na_obraz[rodzaj] = (tokeny - 2000) / obrazy
+
+    def czekaj(self, szac, opis):
+        lim = self.limit()
+        while not STAN['stop']:
+            s = self.suma()
+            if s == 0 or s + szac <= lim:
+                return
+            with self.lock:
+                zostalo = 60 - (time.time() - self.okno[0][0]) if self.okno else 0
+            faza(f'pauza na limit tokenów ({s/1000:.0f}k z {lim/1000:.0f}k na minutę) — '
+                 f'{int(zostalo)+1} s do {opis}')
+            time.sleep(0.5)
+
+
+TOKENY = Tokeny()
+
+
+def generuj(model, cialo, obrazy, rodzaj, timeout=180):
+    """generateContent + zapis zuzytych tokenow wejscia do licznika TPM."""
+    d = http_json(f'{BAZA}/models/{model}:generateContent?key={klucz()}', cialo, timeout)
+    tok = (d.get('usageMetadata') or {}).get('promptTokenCount')
+    TOKENY.dodaj(int(tok) if tok else TOKENY.szacuj(obrazy, rodzaj), obrazy, rodzaj)
+    return d
+
+
+def czytaj_paczke(jpgi, model, prompt=None, rodzaj='depo'):
     """jpgi: lista bajtow JPG. Zwraca liste kodow (str) tej samej dlugosci."""
     czesci = [{'text': prompt or PROMPT}]
     for i, b in enumerate(jpgi, 1):
@@ -592,7 +646,7 @@ def czytaj_paczke(jpgi, model, prompt=None):
             'temperature': 0,
         },
     }
-    d = http_json(f'{BAZA}/models/{model}:generateContent?key={klucz()}', ciało)
+    d = generuj(model, ciało, len(jpgi), rodzaj)
     tekst = d['candidates'][0]['content']['parts'][0]['text']
     wyniki = json.loads(tekst).get('wyniki', [])
 
@@ -707,58 +761,19 @@ def przebieg(pliki, model, na_req, rpm):
                 STAN['zrobione'] += 1
         log(f'skadrowano {len(kadry)}, bez czerwieni {len(bez_czerwieni)}')
 
-        # ── 2. odczyt przez Gemini, paczkami, z pauzami na limit ─────────
+        # ── 2. odczyt przez Gemini, paczkami, z pauzami na limity ────────
         paczki = [kadry[i:i+na_req] for i in range(0, len(kadry), na_req)]
-        odstep = 60.0 / max(rpm, 1)
+        tempo, brak_limitu = Tempo(rpm), False
         with BLOKADA:
             STAN.update(etap='odczyt', ile=len(paczki), zrobione=0)
-        log(f'{len(paczki)} zapytań do {model}, co {odstep:.0f} s')
+        log(f'{len(paczki)} zapytań do {model}, co {tempo.odstep:.0f} s')
 
-        ostatnie, brak_limitu = 0.0, False
         for nr, paczka in enumerate(paczki, 1):
             if STAN['stop']:
                 break
-            czekaj = odstep - (time.time() - ostatnie)
-            while czekaj > 0 and not STAN['stop']:      # pauza na limit RPM
-                faza(f'pauza na limit — {int(czekaj)+1} s do paczki {nr}/{len(paczki)}')
-                time.sleep(min(0.5, czekaj))
-                czekaj = odstep - (time.time() - ostatnie)
-            if STAN['stop']:
-                break
-
-            proba, kody = 0, None
-            while proba < 4 and kody is None and not STAN['stop']:
-                try:
-                    ostatnie = time.time()
-                    faza(f'paczka {nr}/{len(paczki)} — wysłane {len(paczka)} kadrów, '
-                         f'czekam na odpowiedź…')
-                    kody = czytaj_paczke([j for _, j in paczka], model)
-                    faza(f'paczka {nr}/{len(paczki)} — odpowiedź po '
-                         f'{time.time()-ostatnie:.0f} s')
-                    zuzycie(1)                       # doliczamy do licznika dobowego
-                    with BLOKADA:
-                        STAN['req'] += 1
-                except urllib.error.HTTPError as e:
-                    tresc = e.read().decode('utf-8', 'replace')[:200]
-                    if e.code in (429, 500, 503):        # limit albo chwilowy blad
-                        proba += 1
-                        pauza = min(60, 5 * 2 ** proba)
-                        log(f'paczka {nr}: HTTP {e.code}, czekam {pauza} s (próba {proba}/3)')
-                        if e.code == 429 and proba >= 3:
-                            log('LIMIT WYCZERPANY — zapisuję to, co już odczytane, '
-                                'reszta czeka na następny raz')
-                            brak_limitu = True
-                            break
-                        for _ in range(pauza * 2):
-                            if STAN['stop']:
-                                break
-                            time.sleep(0.5)
-                    else:
-                        log(f'paczka {nr}: HTTP {e.code} {tresc} — kończę odczyt, '
-                            'nazywam to, co gotowe')
-                        brak_limitu = True
-                        break
-
+            jpgi = [j for _, j in paczka]
+            kody, brak_limitu = wyslij(tempo, f'paczka {nr}/{len(paczki)}',
+                                       lambda: czytaj_paczke(jpgi, model), len(jpgi), 'depo')
             if kody is None:
                 break
             for (p, _), kod in zip(paczka, kody):
@@ -770,48 +785,40 @@ def przebieg(pliki, model, na_req, rpm):
             with BLOKADA:
                 STAN['zrobione'] = nr
 
-        # ── 2b. drugie podejscie: nieudane -> CALE zdjecia, jednym zapytaniem ──
+        # ── 2b. drugie podejscie: nieudane -> CALE zdjecia ───────────────
         nieudane = [p for p in pliki
                     if mapa.get(os.path.basename(p)) == '?' and os.path.exists(p)]
         if nieudane and not STAN['stop'] and not brak_limitu:
+            czesci = [nieudane[i:i+30] for i in range(0, len(nieudane), 30)]
             with BLOKADA:
-                STAN.update(etap='drugie podejscie', ile=1, zrobione=0)
+                STAN.update(etap='drugie podejscie', ile=len(czesci), zrobione=0)
             znane = sorted({k.replace('+wiele', '') for k in mapa.values()
                             if k and k != '?'})
             log(f'drugie podejście: {len(nieudane)} zdjęć w całości, '
                 f'kontekst {len(znane)} znanych numerów')
-            try:
-                # przerwa na limit RPM przed dodatkowym zapytaniem
-                czekaj = odstep - (time.time() - ostatnie)
-                while czekaj > 0 and not STAN['stop']:
-                    faza(f'pauza na limit — {int(czekaj)+1} s do drugiego podejścia')
-                    time.sleep(min(0.5, czekaj))
-                    czekaj = odstep - (time.time() - ostatnie)
-
-                for i in range(0, len(nieudane), 30):     # 30 zdjec = bezpieczny rozmiar zapytania
-                    czesc = nieudane[i:i+30]
-                    jpgi = [j for j in (orig_do_jpg(x) for x in czesc) if j]
-                    if not jpgi:
-                        continue
-                    ostatnie = time.time()
-                    faza(f'drugie podejście — {len(jpgi)} pełnych zdjęć, czekam…')
-                    kody = czytaj_paczke(jpgi, model,
-                                         PROMPT2 % ('\n'.join('- ' + z for z in znane) or '- (brak)'))
-                    zuzycie(1)
-                    with BLOKADA:
-                        STAN['req'] += 1
-                    odzysk = 0
-                    for x, kod in zip(czesc, kody):
-                        if kod != '?':
-                            mapa[os.path.basename(x)] = kod
-                            odzysk += 1
-                            log(f'  odzyskane: {os.path.basename(x)} -> {kod}')
-                    log(f'drugie podejście: odzyskano {odzysk}/{len(czesc)}')
-                    stan_zapisz(folder, mapa)
-            except Exception as e:
-                log(f'drugie podejście nieudane: {type(e).__name__}: {e}')
-            with BLOKADA:
-                STAN['zrobione'] = 1
+            prompt2 = PROMPT2 % ('\n'.join('- ' + z for z in znane) or '- (brak)')
+            for nr, czesc in enumerate(czesci, 1):
+                if STAN['stop']:
+                    break
+                pary = [(x, j) for x, j in ((x, orig_do_jpg(x)) for x in czesc) if j]
+                if not pary:
+                    continue
+                jpgi = [j for _, j in pary]
+                kody, brak_limitu = wyslij(tempo, f'drugie podejście {nr}/{len(czesci)}',
+                                           lambda: czytaj_paczke(jpgi, model, prompt2, 'depo2'),
+                                           len(jpgi), 'depo2')
+                if kody is None:
+                    break
+                odzysk = 0
+                for (x, _), kod in zip(pary, kody):
+                    if kod != '?':
+                        mapa[os.path.basename(x)] = kod
+                        odzysk += 1
+                        log(f'  odzyskane: {os.path.basename(x)} -> {kod}')
+                log(f'drugie podejście: odzyskano {odzysk}/{len(pary)}')
+                stan_zapisz(folder, mapa)
+                with BLOKADA:
+                    STAN['zrobione'] = nr
 
         # ── 3. zmiana nazw ───────────────────────────────────────────────
         # kopiowanie kilkuset plikow po kilka MB trwa — pokazujemy postep,
@@ -1169,28 +1176,28 @@ def schemat_alu(profile):
     }
 
 
-def gemini(prompt, jpgi, model, schemat):
+def gemini(prompt, jpgi, model, schemat, rodzaj='alu'):
     """Jedno zapytanie z obrazami; zwraca liste 'wyniki' z odpowiedzi JSON."""
     czesci = [{'text': prompt}]
     for i, b in enumerate(jpgi, 1):
         czesci.append({'text': f'--- obraz {i} ---'})
         czesci.append({'inline_data': {'mime_type': 'image/jpeg',
                                        'data': base64.b64encode(b).decode()}})
-    d = http_json(f'{BAZA}/models/{model}:generateContent?key={klucz()}', {
+    d = generuj(model, {
         'contents': [{'parts': czesci}],
         'generationConfig': {'responseMimeType': 'application/json',
                              'responseSchema': schemat, 'temperature': 0},
-    }, timeout=420)                  # 30 calych zdjec potrafi sie mielic kilka minut
+    }, len(jpgi), rodzaj, timeout=420)   # 30 calych zdjec potrafi sie mielic kilka minut
     tekst = ''.join(c.get('text', '') for c in d['candidates'][0]['content']['parts']
                     if not c.get('thought'))
     return json.loads(tekst).get('wyniki', [])
 
 
-def czytaj_alu(jpgi, model, profile, wstep):
+def czytaj_alu(jpgi, model, profile, wstep, rodzaj='alu'):
     """Zwraca liste slownikow {produkt, napis, pewnosc, inne} w kolejnosci obrazow."""
     prompt = (PROMPT_ALU.replace('@@WSTEP@@', wstep)
                         .replace('@@LISTA@@', '\n'.join('- ' + p for p in profile)))
-    wyniki = gemini(prompt, jpgi, model, schemat_alu(profile))
+    wyniki = gemini(prompt, jpgi, model, schemat_alu(profile), rodzaj)
     po_normie = {}
     for p in profile:
         po_normie.setdefault(norm_profilu(p), p)
@@ -1233,11 +1240,28 @@ class Tempo:
             time.sleep(min(0.5, c))
 
 
-def wyslij(tempo, opis, fn):
-    """Zapytanie z pauza na limit i ponawianiem. Zwraca (wynik albo None, limit_wyczerpany)."""
-    proba = 0
+def limit_dobowy(tresc):
+    """Czy 429 dotyczy limitu dobowego? Google podaje to w quotaId (...PerDay...)."""
+    return bool(re.search(r'per\s*day|perday', tresc, re.I))
+
+
+def odczekaj(sekundy, opis):
+    koniec = time.time() + sekundy
+    while not STAN['stop'] and time.time() < koniec:
+        faza(f'{opis} — {int(koniec - time.time()) + 1} s')
+        time.sleep(0.5)
+
+
+def wyslij(tempo, opis, fn, obrazy=0, rodzaj=''):
+    """Zapytanie z pauzami na limity i ponawianiem. Zwraca (wynik albo None, koniec_limitu).
+
+    - limit na minute (zapytan albo tokenow): pilnowany z gory przez Tempo i TOKENY;
+      gdyby API i tak odpowiedzialo 429 — czekamy tyle, ile kaze, i ponawiamy,
+    - limit dobowy: zapisujemy postep i konczymy, reszta przy nastepnym uruchomieniu."""
+    proba = minutowe = 0
     while proba < 4 and not STAN['stop']:
         tempo.czekaj(opis)
+        TOKENY.czekaj(TOKENY.szacuj(obrazy, rodzaj), opis)
         if STAN['stop']:
             break
         try:
@@ -1249,24 +1273,33 @@ def wyslij(tempo, opis, fn):
                 STAN['req'] += 1
             return w, False
         except urllib.error.HTTPError as e:
-            tresc = e.read().decode('utf-8', 'replace')[:200]
-            if e.code not in (429, 500, 503):
-                log(f'{opis}: HTTP {e.code} {tresc} — kończę odczyt, nazywam to, co gotowe')
+            tresc = e.read().decode('utf-8', 'replace')
+            if e.code == 429 and limit_dobowy(tresc):
+                log('LIMIT DOBOWY WYCZERPANY — zapisuję to, co już odczytane, '
+                    'reszta czeka na następny raz')
+                return None, True
+            if e.code == 429:
+                minutowe += 1
+                if minutowe > 10:
+                    log(f'{opis}: limit na minutę nie puszcza od 10 prób — kończę, '
+                        'postęp zapisany')
+                    return None, True
+                m = re.search(r'"retryDelay"\s*:\s*"(\d+)', tresc)
+                pauza = min(120, int(m.group(1)) + 2) if m else 62
+                log(f'{opis}: limit na minutę (tokeny/zapytania) — czekam {pauza} s i ponawiam')
+                odczekaj(pauza, 'limit na minutę, czekam')
+                continue
+            if e.code not in (500, 503):
+                log(f'{opis}: HTTP {e.code} {tresc[:200]} — kończę odczyt, nazywam to, co gotowe')
                 return None, True
             proba += 1
-            if e.code == 429 and proba >= 3:
-                log('LIMIT WYCZERPANY — zapisuję to, co już odczytane, reszta czeka na następny raz')
-                return None, True
             pauza = min(60, 5 * 2 ** proba)
             log(f'{opis}: HTTP {e.code}, czekam {pauza} s (próba {proba}/3)')
         except Exception as e:           # siec, pusta odpowiedz, zly JSON — probujemy jeszcze raz
             proba += 1
             pauza = 5 * proba
             log(f'{opis}: {type(e).__name__}: {str(e)[:120]} — ponawiam za {pauza} s')
-        for _ in range(pauza * 2):
-            if STAN['stop']:
-                break
-            time.sleep(0.5)
+        odczekaj(pauza, 'ponawiam')
     return None, False
 
 
@@ -1527,7 +1560,8 @@ def przebieg_alu(folder, model, na_req, rpm):
                 break
             jpgi = [open(sc, 'rb').read() for _, _, sc in paczka]
             wyn, brak_limitu = wyslij(tempo, f'paczka {nr}/{len(paczki)}',
-                                      lambda: czytaj_alu(jpgi, model, profile, WSTEP_ALU1))
+                                      lambda: czytaj_alu(jpgi, model, profile, WSTEP_ALU1),
+                                      len(jpgi), 'alu')
             if wyn is None:
                 break
             for (k, _, _), w in zip(paczka, wyn):
@@ -1558,7 +1592,8 @@ def przebieg_alu(folder, model, na_req, rpm):
                 if not all(jpgi):
                     continue
                 wyn, brak_limitu = wyslij(tempo, f'drugie podejście {nr}/{len(czesci)}',
-                                          lambda: czytaj_alu(jpgi, model, profile, WSTEP_ALU2))
+                                          lambda: czytaj_alu(jpgi, model, profile, WSTEP_ALU2,
+                                                             'alu2'), len(jpgi), 'alu2')
                 if wyn is None:
                     break
                 ranga = {'ok': 3, 'niepewne': 2, 'spoza': 1, 'brak': 0}
@@ -1779,7 +1814,7 @@ class H(http.server.BaseHTTPRequestHandler):
         if path == '/api/ustawienia':
             U = cfg_wczytaj()
             if r.get('zapisz'):
-                zm = {k: r[k] for k in ('klucz', 'model', 'na_req', 'rpm', 'na_req_alu')
+                zm = {k: r[k] for k in ('klucz', 'model', 'na_req', 'rpm', 'na_req_alu', 'tpm')
                       if k in r}
                 if 'profile' in r:
                     # lista identyczna z wbudowana zapisuje sie jako pusta — wtedy
@@ -2231,6 +2266,8 @@ body.alu .tylkoDepo{display:none}
         <input id="uRpm" type="number" min="1" max="60"></div>
       <div class="pole"><label>Zdjęć ALUPROF w zapytaniu</label>
         <input id="uNaReqAlu" type="number" min="1" max="30"></div>
+      <div class="pole"><label>Tokenów na minutę</label>
+        <input id="uTpm" type="number" min="10000" step="10000"></div>
     </div>
 
     <div class="pole profPole" onclick="profOtworz()">
@@ -2375,6 +2412,7 @@ function ustWczytaj(pokazJesliBrak){
     $('uNaReq').value = U.na_req;
     $('uRpm').value   = U.rpm;
     $('uNaReqAlu').value = U.na_req_alu;
+    $('uTpm').value = U.tpm;
     profEtykieta(U);
     if (!TIK) ustawTryb(U.tryb === 'alu' ? 'alu' : 'depo', false);
     $('wers').textContent = 'v' + U.wersja;
@@ -2451,7 +2489,8 @@ function ustZamknij(){ $('modal').classList.remove('on'); }
 function ustZapisz(){
   post('/api/ustawienia', {zapisz: 1, klucz: $('uKlucz').value.trim(),
     model: $('uModel').value, na_req: +$('uNaReq').value,
-    rpm: +$('uRpm').value, na_req_alu: +$('uNaReqAlu').value || 30}).then(U => {
+    rpm: +$('uRpm').value, na_req_alu: +$('uNaReqAlu').value || 30,
+    tpm: +$('uTpm').value || 250000}).then(U => {
     UST = U;
     profEtykieta(U);
     if (U.ma_klucz){ modele(); $('powiad').classList.remove('on'); ustZamknij(); }

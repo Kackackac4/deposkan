@@ -19,6 +19,26 @@ Nic w toku.
 
 ---
 
+## [1.2.2] — 2026-09-21
+
+### Dodane
+
+- **Pilnowanie limitu tokenów na minutę (TPM).** Program liczy tokeny wejścia z ostatnich
+  60 sekund (prawdziwe liczby z odpowiedzi Gemini) i przed każdym zapytaniem czeka,
+  aż kolejna paczka zmieści się w 80% limitu. W pasku stanu widać wtedy
+  „pauza na limit tokenów (190k z 200k na minutę) — 12 s”. Limit ustawia się
+  w Ustawieniach („Tokenów na minutę”, domyślnie 250 000). Działa w obu trybach.
+
+### Poprawione
+
+- **Limit na minutę nie przerywa już pracy.** Wcześniej trzy odpowiedzi 429 z rzędu
+  były traktowane jak koniec limitu dobowego i program kończył. Teraz odróżnia limit
+  minutowy od dobowego (po `quotaId` w odpowiedzi): przy minutowym czeka tyle, ile każe
+  Google (`retryDelay`), i ponawia; tylko przy dobowym zapisuje postęp i kończy.
+- DEPO korzysta z tego samego mechanizmu limitów co ALUPROF. Przy okazji drugie
+  podejście nie myli kolejności zdjęć, gdy któregoś pliku nie da się otworzyć.
+
+
 ## [1.2.1] — 2026-09-21
 
 ### Zmienione
