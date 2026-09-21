@@ -84,7 +84,7 @@ jobs:
 
       # Prawdziwa podmiana na prawdziwym Windowsie, zanim wydanie trafi do ludzi:
       # "stara wersja" to kopia PING.EXE, ktora dziala 5 s i trzyma plik (jak otwarta
-      # aplikacja). Nowy DEPOSKAN.exe.new --podmien musi poczekac, podmienic plik
+      # aplikacja). Nowy DEPOSKAN-nowy.exe --podmien musi poczekac, podmienic plik
       # i uruchomic go — a uruchomiona wersja zapisuje w logu "start testowy".
       - name: Test podmiany przy aktualizacji (Windows)
         if: runner.os == 'Windows'
@@ -98,11 +98,18 @@ jobs:
           $log = Join-Path $env:TEMP 'deposkan-aktualizacja.log'
           Remove-Item $log -ErrorAction SilentlyContinue
           Copy-Item C:\Windows\System32\PING.EXE $cel
-          Copy-Item dist\DEPOSKAN.exe "$cel.new"
+          $nowy = Join-Path $d 'DEPOSKAN-nowy.exe'
+          Copy-Item dist\DEPOSKAN.exe $nowy
           $stary = Start-Process -FilePath $cel -ArgumentList '-n','6','127.0.0.1' -PassThru -WindowStyle Hidden
-          # .new sam jest procesem PyInstallera (ma zmienne _PYI_*) i uruchamia wlasciwa
-          # aplikacje — dokladnie to psulo stary mechanizm; tu musi zadzialac
-          Start-Process -FilePath "$cel.new" -ArgumentList '--podmien',"`"$cel`"",$stary.Id
+          # uruchamiamy tak jak aplikacja: bezposrednio (CreateProcess), nie przez powloke.
+          # Nowa wersja sama jest procesem PyInstallera (ma zmienne _PYI_*) i uruchamia
+          # wlasciwa aplikacje — dokladnie to psulo stary mechanizm; tu musi zadzialac
+          $si = New-Object System.Diagnostics.ProcessStartInfo
+          $si.FileName = $nowy
+          $si.Arguments = "--podmien `"$cel`" $($stary.Id)"
+          $si.UseShellExecute = $false
+          $p = [System.Diagnostics.Process]::Start($si)
+          Write-Host "uruchomiono nowa wersje, PID $($p.Id)"
           $wzor = (Get-FileHash dist\DEPOSKAN.exe).Hash
           for ($i = 0; $i -lt 90; $i++) {
             Start-Sleep 1
@@ -110,6 +117,8 @@ jobs:
             if ($ok) { break }
           }
           Write-Host "--- log aktualizacji:"; Get-Content $log -ErrorAction SilentlyContinue
+          Write-Host "--- nowa wersja: zakonczona=$($p.HasExited) kod=$(if ($p.HasExited) { $p.ExitCode })"
+          Write-Host "--- pliki:"; Get-ChildItem $d | Format-Table Name, Length -AutoSize | Out-String | Write-Host
           if ((Get-FileHash $cel).Hash -ne $wzor) { Write-Error 'plik NIE zostal podmieniony'; exit 1 }
           if (-not $ok) { Write-Error 'podmieniona wersja NIE wystartowala'; exit 1 }
           Write-Host 'podmiana i ponowne uruchomienie: OK'

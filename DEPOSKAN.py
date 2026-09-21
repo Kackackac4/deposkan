@@ -416,9 +416,15 @@ def pobierz_z_kontrola(url, cel, suma_url=None, nazwa=None):
 #    i szuka jego katalogu tymczasowego (_MEI...), ktorego juz nie ma — nie startuje,
 #  - bledy PowerShella (polityka wykonywania skryptow w firmie, kodowanie sciezek)
 #    ginely bez sladu.
-# Teraz podmiane robi SAMA NOWA WERSJA: pobiera sie obok jako DEPOSKAN.exe.new i jest
+# Teraz podmiane robi SAMA NOWA WERSJA: pobiera sie obok jako DEPOSKAN-nowy.exe i jest
 # uruchamiana z czystym srodowiskiem i argumentem --podmien.
 LOG_AKT = os.path.join(tempfile.gettempdir(), 'deposkan-aktualizacja.log')
+
+
+def plik_nowej(cel):
+    """Gdzie laduje pobrana nowa wersja: obok zainstalowanej, jako zwykly .exe
+    (antywirusy i Windows gorzej traktuja programy z nietypowym rozszerzeniem)."""
+    return os.path.splitext(cel)[0] + '-nowy.exe'
 
 
 def log_akt(t):
@@ -456,7 +462,7 @@ def czekaj_na_proces(pid, sekundy):
 
 
 def podmien_windows(cel, pid):
-    """Uruchamiane z NOWEGO pliku (DEPOSKAN.exe.new --podmien <cel> <pid>).
+    """Uruchamiane z NOWEGO pliku (DEPOSKAN-nowy.exe --podmien <cel> <pid>).
     Czeka na zamkniecie starej wersji, kopiuje sie w jej miejsce i ja uruchamia."""
     nowy = os.path.abspath(sys.executable)
     log_akt(f'podmiana {WERSJA}: {nowy} -> {cel}, czekam na zamknięcie PID {pid}')
@@ -488,13 +494,12 @@ def podmien_windows(cel, pid):
 
 
 def sprzatnij_po_aktualizacji():
-    """Przy starcie: resztki po podmianie (.new, .tmp, .stary z wersji z PowerShellem)."""
+    """Przy starcie: resztki po podmianie (-nowy.exe, .tmp, .stary z wersji z PowerShellem)."""
     cel = sciezka_aplikacji()
-    if not cel or sys.platform != 'win32':
+    if not cel or sys.platform != 'win32' or os.path.abspath(cel) == os.path.abspath(plik_nowej(cel)):
         return
-    for dopisek in ('.new', '.tmp', '.stary'):
-        p = cel + dopisek
-        for _ in range(10):                       # .new moze jeszcze konczyc prace
+    for p in (plik_nowej(cel), cel + '.tmp', cel + '.stary'):
+        for _ in range(10):                       # -nowy.exe moze jeszcze konczyc prace
             try:
                 if os.path.exists(p):
                     os.remove(p)
@@ -570,7 +575,7 @@ rm -rf "{tmp}"
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         # nowa wersja laduje obok zainstalowanej i sama robi podmiane (podmien_windows)
-        nowy = cel + '.new'
+        nowy = plik_nowej(cel)
         try:
             shutil.copyfile(paczka, nowy)
         except OSError:                          # katalog tylko do odczytu — zostajemy w TEMP

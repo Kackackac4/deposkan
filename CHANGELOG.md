@@ -29,7 +29,7 @@ Nic w toku.
   przez co nowy `DEPOSKAN.exe` uznawał się za proces potomny starego i szukał jego
   nieistniejącego już katalogu tymczasowego; błędy PowerShella (polityka skryptów,
   kodowanie ścieżek) ginęły bez śladu.
-  Teraz nowa wersja pobiera się obok jako `DEPOSKAN.exe.new`, startuje z czystym
+  Teraz nowa wersja pobiera się obok jako `DEPOSKAN-nowy.exe`, startuje z czystym
   środowiskiem, czeka na zamknięcie starej, podmienia plik (z ponawianiem, gdy trzyma go
   antywirus) i uruchamia aplikację. Przebieg w `%TEMP%\deposkan-aktualizacja.log`.
   **Podmiana jest testowana przy każdym budowaniu na prawdziwym Windowsie.**
