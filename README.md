@@ -1,11 +1,19 @@
-# DEPOSKAN
+# MakroSkan (dawniej DEPOSKAN)
 
 [![Build](https://github.com/Kackackac4/deposkan/actions/workflows/build.yml/badge.svg)](https://github.com/Kackackac4/deposkan/actions/workflows/build.yml)
 [![Wydanie](https://img.shields.io/github/v/release/Kackackac4/deposkan?label=wydanie)](https://github.com/Kackackac4/deposkan/releases/latest)
 [![Pobrania](https://img.shields.io/github/downloads/Kackackac4/deposkan/total?label=pobrania)](https://github.com/Kackackac4/deposkan/releases)
 ![Platformy](https://img.shields.io/badge/platformy-macOS%20%7C%20Windows-lightgrey)
 
-Rozpoznawanie ręcznie pisanych numerów zamówień ze zdjęć paczek.
+Rozpoznawanie zdjęć dla dwóch działów — przełącznik **DEPO / ALUPROF** na górze okna.
+
+**ALUPROF** — wskazujesz folder (z podfolderami i archiwami `.zip`/`.rar`/`.7z`),
+zdjęcia są kompresowane i wysyłane do Gemini, które na każdym znajduje wydrukowane
+oznaczenie profilu z listy. Kopie oryginałów z nazwą produktu i raport
+(status każdego zdjęcia + lista produktów z ilością) trafiają do nowego folderu
+**„<nazwa folderu> MakroSkan”**. Listę profili można zmienić w Ustawieniach.
+
+**DEPO** — rozpoznawanie ręcznie pisanych numerów zamówień ze zdjęć paczek.
 
 OpenCV znajduje lokalnie czerwony numer i przycina kadr (za darmo, ~0,1 s na zdjęcie),
 a do Gemini idą tylko małe wycinki. Kopie oryginałów trafiają do podfolderu

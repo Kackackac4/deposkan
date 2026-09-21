@@ -1,4 +1,7 @@
-# Instalator DEPOSKAN dla Windows.
+# Instalator MakroSkan (dawniej DEPOSKAN) dla Windows.
+#
+# Plik nadal nazywa sie DEPOSKAN.exe — po tej nazwie aktualizuja sie zainstalowane
+# kopie. Skroty nazywaja sie juz MakroSkan.
 #
 # Pobiera najnowsze wydanie, wgrywa do folderu uzytkownika i tworzy skroty
 # w Menu Start i na pulpicie.
@@ -17,7 +20,7 @@ $zrodlo = 'https://github.com/Kackackac4/deposkan/releases/latest/download/DEPOS
 $katalog = Join-Path $env:LOCALAPPDATA 'Programs\DEPOSKAN'
 $plik = Join-Path $katalog 'DEPOSKAN.exe'
 
-Write-Host 'Pobieram najnowsze wydanie DEPOSKAN...'
+Write-Host 'Pobieram najnowsze wydanie MakroSkan...'
 New-Item -ItemType Directory -Force -Path $katalog | Out-Null
 
 # jesli aplikacja chodzi, zamykamy ja przed podmiana pliku
@@ -30,16 +33,19 @@ Invoke-WebRequest -Uri $zrodlo -OutFile $plik -UseBasicParsing
 Unblock-File -Path $plik -ErrorAction SilentlyContinue
 
 Write-Host 'Tworze skroty...'
+$menu    = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+$pulpit  = [Environment]::GetFolderPath('Desktop')
+# skroty ze starej nazwy — zeby nie bylo dwoch ikon tej samej aplikacji
+foreach ($stary in @((Join-Path $menu 'DEPOSKAN.lnk'), (Join-Path $pulpit 'DEPOSKAN.lnk'))) {
+    Remove-Item -LiteralPath $stary -Force -ErrorAction SilentlyContinue
+}
 $shell = New-Object -ComObject WScript.Shell
-foreach ($gdzie in @(
-    (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\DEPOSKAN.lnk'),
-    (Join-Path ([Environment]::GetFolderPath('Desktop')) 'DEPOSKAN.lnk')
-)) {
+foreach ($gdzie in @((Join-Path $menu 'MakroSkan.lnk'), (Join-Path $pulpit 'MakroSkan.lnk'))) {
     $skrot = $shell.CreateShortcut($gdzie)
     $skrot.TargetPath = $plik
     $skrot.WorkingDirectory = $katalog
     $skrot.IconLocation = $plik
-    $skrot.Description = 'DEPOSKAN - rozpoznawanie numerow zamowien ze zdjec'
+    $skrot.Description = 'MakroSkan - rozpoznawanie zdjec DEPO i ALUPROF'
     $skrot.Save()
 }
 

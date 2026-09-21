@@ -1,5 +1,8 @@
 #!/bin/bash
-# Instalator DEPOSKAN dla macOS.
+# Instalator MakroSkan (dawniej DEPOSKAN) dla macOS.
+#
+# Plik aplikacji nadal nazywa sie DEPOSKAN.app — po tej nazwie aktualizuja sie
+# zainstalowane kopie. W oknie, pasku menu i Docku widac MakroSkan.
 #
 # Pobiera najnowsze wydanie i wgrywa je do folderu Programy.
 #
@@ -18,7 +21,7 @@ CEL="/Applications"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-echo "Pobieram najnowsze wydanie DEPOSKAN…"
+echo "Pobieram najnowsze wydanie MakroSkan…"
 curl -fL# -o "$TMP/deposkan.zip" "$ZRODLO"
 
 echo "Rozpakowuję…"

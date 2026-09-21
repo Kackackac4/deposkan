@@ -19,6 +19,47 @@ Nic w toku.
 
 ---
 
+## [1.2.0] — 2026-09-21
+
+### Zmienione
+
+- **DEPOSKAN nazywa się teraz MakroSkan.** Nowe logo — ten sam aparat z etykietą,
+  tło w gradiencie pomarańcz → błękit. Pliki wydania (`DEPOSKAN.exe`,
+  `DEPOSKAN-macOS.zip`) i katalog ustawień zostają pod starą nazwą, żeby
+  zainstalowane kopie zaktualizowały się same, a klucz API nie zniknął.
+  Na macOS w pasku menu i Docku widać już MakroSkan.
+- W stopce zamiast imienia i nazwiska jest logo *makarewicz/*.
+
+### Dodane
+
+- **Przełącznik DEPO / ALUPROF** na górze okna. DEPO działa jak dotąd
+  (pomarańcz), ALUPROF przełącza kolor wiodący na błękit.
+- **Tryb ALUPROF** — rozpoznawanie wydrukowanych oznaczeń profili:
+  - zamiast zdjęć wskazuje się **folder**; program zbiera zdjęcia także
+    z podfolderów i z archiwów (`.zip`, a przez systemowy `tar` również
+    `.rar`, `.7z`, `.tar.gz`),
+  - zdjęcia są najpierw **kompresowane** (dłuższy bok 1600 px — z ok. 7 MB
+    robi się ok. 0,3 MB, a napis dalej jest czytelny); bez kadrowania i bez
+    szukania czerwieni, bo oznaczenie może być w dowolnym miejscu,
+  - Gemini wybiera produkt **z zamkniętej listy profili** (wbudowana, do edycji
+    w Ustawieniach); nierozpoznane i niepewne idą drugi raz w wyższej
+    rozdzielczości,
+  - kopie oryginałów z nazwą produktu trafiają do nowego folderu
+    **„<nazwa folderu> MakroSkan”** (`/` w nazwie profilu zamienia się na `-`),
+    razem z raportem `Raport MakroSkan.txt` i `.csv`: status każdego zdjęcia
+    oraz lista produktów z ilością (`PSB 170/02 pak  x 5`),
+  - postęp zapisuje się jak w DEPO — po wyczerpaniu limitu program dokończy
+    przy następnym uruchomieniu na tym samym folderze.
+
+### Poprawione
+
+- Zdjęcia w folderach z polskimi znakami w nazwie otwierają się także na Windows
+  (`cv2.imread` nie radzi sobie tam z taką ścieżką).
+- Aktualizacja na macOS bierze z paczki bundle o dowolnej nazwie — przyszła zmiana
+  nazwy pliku wydania nie zepsuje aktualizacji zainstalowanych kopii.
+
+---
+
 ## [1.1.0] — 2026-09-09
 
 ### Poprawione

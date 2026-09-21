@@ -45,6 +45,15 @@ jobs:
             --hidden-import objc --hidden-import Foundation \
             --hidden-import AppKit --hidden-import WebKit \
             DEPOSKAN.py
+          # Plik bundla zostaje DEPOSKAN.app (po tej nazwie aktualizuja sie zainstalowane
+          # kopie), ale w pasku menu i Docku ma byc widac MakroSkan. Zmiana Info.plist
+          # uniewaznia podpis ad-hoc, wiec podpisujemy bundle jeszcze raz.
+          PL=dist/DEPOSKAN.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName MakroSkan" "$PL"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string MakroSkan" "$PL" \
+            || /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName MakroSkan" "$PL"
+          codesign --force --deep --sign - dist/DEPOSKAN.app
+          codesign --verify --deep --strict dist/DEPOSKAN.app
           # ditto zachowuje atrybuty i dowiazania w bundlu — zwykly zip potrafi
           # zepsuc podpis, a wtedy macOS mowi "plik uszkodzony" zamiast zwyklego
           # ostrzezenia o niezweryfikowanym tworcy
