@@ -19,6 +19,16 @@ Nic w toku.
 
 ---
 
+## [1.3.3] — 2026-09-21
+
+### Zmienione
+
+- **ALUPROF: produkty w raporcie alfabetycznie** (po ludzku: „PSB 170” przed „PSB 1000”),
+  zamiast według liczby sztuk. Tak samo w oknie programu.
+- **Raport tylko jako karteczka PNG** — bez pliku `Raport MakroSkan.txt`. Po zakończeniu
+  otwiera się sama karteczka.
+
+
 ## [1.3.2] — 2026-09-21
 
 ### Poprawione

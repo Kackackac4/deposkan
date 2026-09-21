@@ -10,7 +10,7 @@ Rozpoznawanie zdjęć dla dwóch działów — przełącznik **DEPO / ALUPROF** 
 **ALUPROF** — wskazujesz folder (z podfolderami i archiwami `.zip`/`.rar`/`.7z`),
 zdjęcia są kompresowane i wysyłane do Gemini, które na każdym znajduje wydrukowane
 oznaczenie profilu z listy. Kopie oryginałów z nazwą produktu i raport
-(status każdego zdjęcia + lista produktów z ilością) trafiają do nowego folderu
+(karteczka PNG: lista produktów alfabetycznie z ilością) trafiają do nowego folderu
 **„<nazwa folderu> MakroSkan”**. Listę profili można zmienić w Ustawieniach.
 
 **DEPO** — rozpoznawanie ręcznie pisanych numerów zamówień ze zdjęć paczek.

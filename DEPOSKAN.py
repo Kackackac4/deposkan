@@ -36,7 +36,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.3.2'
+WERSJA = '1.3.3'
 NAZWA  = 'MakroSkan'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 # Pliki wydania (DEPOSKAN.exe, DEPOSKAN-macOS.zip) i katalog ustawien zostaja pod stara
@@ -1452,37 +1452,17 @@ def nazwa_wyniku(w, stary):
 
 
 def raport_alu(folder, cel_dir, wyniki, produkty):
-    """Raport tekstowy (wszystkie zdjecia) + karteczka PNG (podsumowanie) w folderze wynikowym."""
-    ile = len(wyniki)
+    """Raport = karteczka PNG z podsumowaniem w folderze wynikowym (bez pliku TXT)."""
     licz = {k: sum(1 for w in wyniki if w['status'] == k)
             for k in ('ok', 'niepewne', 'spoza', 'brak', 'blad')}
-    etyk = {'ok': 'ROZPOZNANE', 'niepewne': 'NIEPEWNE', 'spoza': 'SPOZA LISTY',
-            'brak': 'NIEROZPOZNANE', 'blad': 'BŁĄD PLIKU'}
-    L = [f'{NAZWA} — raport ALUPROF',
-         f'Folder:  {folder}',
-         f'Data:    {time.strftime("%Y-%m-%d %H:%M")}',
-         '',
-         f'Zdjęć: {ile}  ·  rozpoznane: {licz["ok"]}  ·  niepewne: {licz["niepewne"]}  ·  '
-         f'spoza listy: {licz["spoza"]}  ·  nierozpoznane: {licz["brak"] + licz["blad"]}',
-         '', 'PRODUKTY', '']
-    szer = max([len(p['produkt']) for p in produkty] + [10])
-    for p in produkty:
-        L.append(f'  {p["produkt"].ljust(szer)}  x {p["ile"]}'
-                 + (f'   (w tym niepewne: {p["niepewne"]})' if p['niepewne'] else ''))
-    if not produkty:
-        L.append('  (brak)')
-    L += ['', 'ZDJĘCIA', '']
-    for w in wyniki:
-        L.append(f'  [{etyk[w["status"]]}]  {w["stary"]}  ->  {w["nowy"]}'
-                 + ('   [pakowane — wiele etykiet]' if w.get('pakowane') else '')
-                 + (f'   (napis: {w["napis"]})' if w.get('napis') else ''))
-    with open(os.path.join(cel_dir, f'Raport {NAZWA}.txt'), 'w', encoding='utf-8') as f:
-        f.write('\n'.join(L) + '\n')
+    sciezka = os.path.join(cel_dir, f'Raport {NAZWA}.png')
+    karteczka_alu(folder, len(wyniki), licz, produkty, sciezka)
+    return sciezka
 
-    try:
-        karteczka_alu(folder, ile, licz, produkty, os.path.join(cel_dir, f'Raport {NAZWA}.png'))
-    except Exception as e:
-        log(f'karteczka PNG nie zapisana: {type(e).__name__}: {e}')
+
+def klucz_alfabetyczny(nazwa):
+    """Sortowanie jak czlowiek: "PSB 170" przed "PSB 1000", wielkosc liter bez znaczenia."""
+    return [int(c) if c.isdigit() else c.casefold() for c in re.split(r'(\d+)', nazwa)]
 
 
 def czcionka(rozmiar, gruba=False):
@@ -1721,16 +1701,13 @@ def przebieg_alu(folder, model, na_req, rpm):
                 z = zest.setdefault(prod, {'produkt': prod, 'ile': 0, 'niepewne': 0})
                 z['ile'] += 1
                 z['niepewne'] += w['status'] == 'niepewne'
-        kolej = {z_folia(p): i for i, p in enumerate(profile)}
-        produkty = sorted(zest.values(), key=lambda z: (-z['ile'], kolej.get(z['produkt'], 1e9)))
+        produkty = sorted(zest.values(), key=lambda z: klucz_alfabetyczny(z['produkt']))
         try:
-            raport_alu(folder, cel_dir, wyniki, produkty)
-            # od razu na ekran: karteczka z podsumowaniem i pelny raport
+            karteczka = raport_alu(folder, cel_dir, wyniki, produkty)
             if wyniki:
-                for plik in (f'Raport {NAZWA}.png', f'Raport {NAZWA}.txt'):
-                    otworz_plik(os.path.join(cel_dir, plik))
+                otworz_plik(karteczka)            # od razu na ekran
         except Exception as e:
-            log(f'raport nie zapisany: {e}')
+            log(f'raport nie zapisany: {type(e).__name__}: {e}')
 
         with BLOKADA:
             STAN.update(wyniki=wyniki, produkty=produkty)
