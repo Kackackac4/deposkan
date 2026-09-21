@@ -19,6 +19,22 @@ Nic w toku.
 
 ---
 
+## [1.3.2] — 2026-09-21
+
+### Poprawione
+
+- **ALUPROF: rozpoznawanie wersji pakowanych.** W 1.3.0 model sam z siebie prawie nigdy
+  nie oceniał zdjęcia jako „pakowane” (na zdjęciach z 04.09: 0 z 6 pakowanych PSG 230/02).
+  Teraz opisuje cechy etykiet, a decyzję podejmuje program:
+  - ile etykiet z tym samym oznaczeniem widać (3 i więcej = pakowane),
+  - czy kod QR jest po lewej stronie nazwy produktu (mała etykieta paczki), czy nisko,
+    w rogu dużej etykiety (profil niepakowany),
+  - czy spod folii przebija pomarańczowy kolor listew.
+
+  Sprawdzone na prawdziwych zdjęciach z 20.08, 28.08 i 04.09: 59 zdjęć, wszystkie
+  10 pakowanych rozpoznane, żadne niepakowane nie dostało „pak”.
+
+
 ## [1.3.1] — 2026-09-21
 
 ### Zmienione

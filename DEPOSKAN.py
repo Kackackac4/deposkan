@@ -36,7 +36,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.3.1'
+WERSJA = '1.3.2'
 NAZWA  = 'MakroSkan'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 # Pliki wydania (DEPOSKAN.exe, DEPOSKAN-macOS.zip) i katalog ustawien zostaja pod stara
@@ -1182,11 +1182,18 @@ Zasady:
   co do znaku — pewnosc "niska".
 - Jesli na zdjeciu sa ROZNE profile: w "produkt" najlepiej widoczny, pozostale (z listy)
   w "inne". Gdy profil jest jeden — "inne" puste.
-- "pakowane": czesc profili wystepuje w wersji PAKOWANEJ (na liscie z dopiskiem "pak").
-  Wtedy na zdjeciu nie ma jednej dlugiej listwy, tylko kosz albo stos wielu mniejszych
-  paczek listew, a na nich WIELE MALYCH, IDENTYCZNYCH ETYKIET z tym samym oznaczeniem.
-  Jesli tak jest — "pakowane": true i w "produkt" wybierz wariant z dopiskiem "pak".
-  Jedna etykieta na jednej listwie/paczce — "pakowane": false.
+- WERSJA PAKOWANA. Czesc profili wystepuje jako pakowane (na liscie z dopiskiem "pak").
+  Rozpoznasz je po etykietach — opisz je w trzech polach:
+  * "etykiety": ile etykiet z TYM SAMYM oznaczeniem produktu widac na zdjeciu (liczac
+    tez czesciowo widoczne). Pakowane to stos wielu malych paczek, kazda z wlasna mala
+    etykieta — zwykle widac ich kilka, jedna nad druga.
+  * "qr_obok_nazwy": true, jesli kod QR jest PO LEWEJ STRONIE nazwy produktu, w tej samej
+    linii (tak wyglada mala etykieta paczki). false, jesli kod QR jest duzo nizej,
+    w dolnym rogu duzej etykiety (tak wyglada etykieta niepakowanego profilu: jedna duza
+    kartka z logo ALUPROF na gorze, nazwa na srodku, QR na dole).
+  * "pomaranczowy": true, jesli spod folii przebija troche POMARANCZOWEGO koloru listew.
+  * "pakowane": twoja ocena, czy to wersja pakowana. Jesli tak, a na liscie jest wariant
+    z "pak" — w "produkt" wybierz wariant z "pak".
 - "folia": true, jesli na zdjeciu widac dopisek o FOLII OCHRONNEJ — napis "folia ochronna",
   "folia", albo osobna litere "F" / "F." dopisana przy oznaczeniu profilu. Litera F bedaca
   czescia oznaczenia z listy (np. "KF.") sie nie liczy. W przeciwnym razie false.
@@ -1211,9 +1218,13 @@ def schemat_alu(profile):
                 'pewnosc': {'type': 'STRING', 'enum': ['wysoka', 'niska']},
                 'inne':    {'type': 'ARRAY', 'items': {'type': 'STRING'}},
                 'folia':   {'type': 'BOOLEAN'},
+                'etykiety': {'type': 'INTEGER'},
+                'qr_obok_nazwy': {'type': 'BOOLEAN'},
+                'pomaranczowy': {'type': 'BOOLEAN'},
                 'pakowane': {'type': 'BOOLEAN'},
             },
-            'required': ['nr', 'produkt', 'napis', 'pewnosc', 'inne', 'folia', 'pakowane'],
+            'required': ['nr', 'produkt', 'napis', 'pewnosc', 'inne', 'folia',
+                         'etykiety', 'qr_obok_nazwy', 'pomaranczowy', 'pakowane'],
         }}},
         'required': ['wyniki'],
     }
@@ -1268,7 +1279,15 @@ def czytaj_alu(jpgi, model, profile, wstep, rodzaj='alu'):
         # dlatego i tak sprawdzamy po normie, a w drugiej kolejnosci po samym napisie
         prod = po_normie.get(norm_profilu(w.get('produkt'))) or \
                (po_normie.get(norm_profilu(napis)) if napis else None)
-        pakowane = bool(w.get('pakowane'))
+        # Model sam z siebie rzadko ocenia "pakowane" (sprawdzone na zdjeciach z 04.09:
+        # 0 z 6 pakowanych PSG 230/02), ale dobrze opisuje cechy etykiet — decyzje
+        # podejmujemy tutaj. Mala etykieta paczki ma QR obok nazwy; duza etykieta
+        # niepakowanego profilu ma QR na dole i zwykle jest jedna na zdjeciu.
+        try:
+            etykiety = int(w.get('etykiety') or 0)
+        except (TypeError, ValueError):
+            etykiety = 0
+        pakowane = bool(w.get('pakowane') or w.get('qr_obok_nazwy') or etykiety >= 3)
         # wiele identycznych etykiet = wersja pakowana; gdy model to zauwazyl, a wybral
         # wariant bez "pak", a na liscie jest wariant "pak" — bierzemy wariant "pak"
         if prod and pakowane and not re.search(r'\bpak\.?$', prod, re.I):
