@@ -5,3 +5,4 @@ pyobjc-core; sys_platform == 'darwin'
 pyobjc-framework-Cocoa; sys_platform == 'darwin'
 pyobjc-framework-WebKit; sys_platform == 'darwin'
 pythonnet; sys_platform == 'win32'
+pillow>=10.1

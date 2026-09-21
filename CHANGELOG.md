@@ -19,6 +19,29 @@ Nic w toku.
 
 ---
 
+## [1.2.1] — 2026-09-21
+
+### Zmienione
+
+- **ALUPROF: paczki po 30 zdjęć** zamiast 10 — model widzi więcej zdjęć naraz, a limit
+  dobowy starcza na trzy razy więcej. Paczka jest dzielona wcześniej, gdyby przekroczyła
+  ~17 MB (Gemini przyjmuje do 20 MB na zapytanie). Kto w 1.2.0 zapisał ustawienia
+  z wartością 10, dostaje 30 automatycznie.
+- **Raport:** zamiast CSV mała karteczka `Raport MakroSkan.png` z listą produktów
+  i ilością; pełna lista zdjęć zostaje w `Raport MakroSkan.txt`.
+- **Lista profili ALUPROF** edytowana w osobnym oknie: wyszukiwarka, dodawanie
+  (także wklejenie wielu linii naraz), usuwanie krzyżykiem, przywracanie wbudowanej.
+- **Stopka:** znak MAK i logo *makarewicz/* w wysokości tekstu, na jednej linii bazowej
+  z napisem; *makarewicz/* w kolorze tekstu.
+- Usunięty opis pod „Wybierz folder”.
+
+### Dodane
+
+- **Folia ochronna:** gdy na zdjęciu jest dopisek „folia ochronna”, „folia” albo „F”
+  przy oznaczeniu, nazwa kończy się na „Folia” (`PSB 210-08 Folia.jpg`). Warianty z listy
+  z dopiskiem `F` / `F.` też dostają „Folia” zamiast litery. `KF.` zostaje bez zmian.
+
+
 ## [1.2.0] — 2026-09-21
 
 ### Zmienione

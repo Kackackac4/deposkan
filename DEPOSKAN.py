@@ -36,7 +36,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.2.0'
+WERSJA = '1.2.1'
 NAZWA  = 'MakroSkan'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 # Pliki wydania (DEPOSKAN.exe, DEPOSKAN-macOS.zip) i katalog ustawien zostaja pod stara
@@ -50,7 +50,7 @@ DOMYSLNE = {
     'na_req': 25,                      # kadrow w jednym zapytaniu
     'rpm':    15,                      # zapytan na minute
     'tryb':   'depo',                  # 'depo' albo 'alu' — ostatnio wybrany przelacznik
-    'na_req_alu': 10,                  # calych zdjec ALUPROF w jednym zapytaniu
+    'na_req_alu': 30,                  # calych zdjec ALUPROF w jednym zapytaniu
     'profile': '',                     # wlasna lista profili ALUPROF; pusta = PROFILE_ALUPROF
 }
 
@@ -1004,6 +1004,7 @@ DOPISEK   = ' MakroSkan'   # folder wynikowy: "<nazwa folderu> MakroSkan"
 ALU_PX, ALU_JAKOSC   = 1600, 82   # kompresja do pierwszego odczytu: ~150-300 KB/zdjecie
 ALU_PX2, ALU_JAKOSC2 = 2400, 86   # drugie podejscie dla nierozpoznanych — wiecej szczegolu
 ALU_NA_REQ2          = 4
+ALU_MAX_BAJTOW       = 13 * 1024 * 1024
 
 
 def lista_profili():
@@ -1137,6 +1138,9 @@ Zasady:
   co do znaku — pewnosc "niska".
 - Jesli na zdjeciu sa ROZNE profile: w "produkt" najlepiej widoczny, pozostale (z listy)
   w "inne". Gdy profil jest jeden — "inne" puste.
+- "folia": true, jesli na zdjeciu widac dopisek o FOLII OCHRONNEJ — napis "folia ochronna",
+  "folia", albo osobna litere "F" / "F." dopisana przy oznaczeniu profilu. Litera F bedaca
+  czescia oznaczenia z listy (np. "KF.") sie nie liczy. W przeciwnym razie false.
 - Nie zgaduj. Brak czytelnego oznaczenia -> produkt "?", pewnosc "niska".
 
 Obrazy sa ponumerowane. Dla kazdego zwroc jeden wpis z jego numerem."""
@@ -1157,8 +1161,9 @@ def schemat_alu(profile):
                 'napis':   {'type': 'STRING'},
                 'pewnosc': {'type': 'STRING', 'enum': ['wysoka', 'niska']},
                 'inne':    {'type': 'ARRAY', 'items': {'type': 'STRING'}},
+                'folia':   {'type': 'BOOLEAN'},
             },
-            'required': ['nr', 'produkt', 'napis', 'pewnosc', 'inne'],
+            'required': ['nr', 'produkt', 'napis', 'pewnosc', 'inne', 'folia'],
         }}},
         'required': ['wyniki'],
     }
@@ -1175,7 +1180,7 @@ def gemini(prompt, jpgi, model, schemat):
         'contents': [{'parts': czesci}],
         'generationConfig': {'responseMimeType': 'application/json',
                              'responseSchema': schemat, 'temperature': 0},
-    })
+    }, timeout=420)                  # 30 calych zdjec potrafi sie mielic kilka minut
     tekst = ''.join(c.get('text', '') for c in d['candidates'][0]['content']['parts']
                     if not c.get('thought'))
     return json.loads(tekst).get('wyniki', [])
@@ -1209,7 +1214,8 @@ def czytaj_alu(jpgi, model, profile, wstep):
             status = 'spoza'              # cos wydrukowane, ale nie z naszej listy
         else:
             status = 'brak'
-        out[i] = {'produkt': prod or '', 'napis': napis, 'status': status, 'inne': inne}
+        out[i] = {'produkt': prod or '', 'napis': napis, 'status': status, 'inne': inne,
+                  'folia': bool(w.get('folia'))}
     return out
 
 
@@ -1304,19 +1310,37 @@ def miejsce_na(cel_dir, trzon, roz, zrodlo, zajete):
             return cel, True
 
 
+def z_folia(prod, folia=False):
+    """Nazwa do pliku i raportu: dopisek "F"/"F." z listy albo zauwazona na zdjeciu
+    folia ochronna -> "Folia" na koncu."""
+    m = re.match(r'^(.*\S)\s+F\.?$', prod)
+    if m:
+        return m.group(1) + ' Folia'
+    if re.search(r'\sKF\.?(\s|$)', prod):   # "KF." to osobny wariant z listy, zostaje jak jest
+        return prod
+    return prod + ' Folia' if folia else prod
+
+
+def produkty_wyniku(w):
+    """Lista nazw produktow ze zdjecia (glowny + inne), juz z dopiskiem Folia."""
+    if not w.get('produkt'):
+        return []
+    return [z_folia(w['produkt'], w.get('folia'))] + [z_folia(x) for x in w.get('inne', [])]
+
+
 def nazwa_wyniku(w, stary):
     baza, roz = os.path.splitext(os.path.basename(stary))
     st = w.get('status')
     if st in ('ok', 'niepewne'):
-        trzon = ' + '.join(nazwa_pliku(x) for x in [w['produkt']] + w.get('inne', []))
+        trzon = ' + '.join(nazwa_pliku(x) for x in produkty_wyniku(w))
         return trzon + (' (niepewne)' if st == 'niepewne' else ''), roz
     if st == 'spoza':
-        return f'{nazwa_pliku(w["napis"])} (spoza listy)', roz
+        return f'{nazwa_pliku(z_folia(w["napis"], w.get("folia")))} (spoza listy)', roz
     return f'NIEROZPOZNANE {baza}', roz
 
 
 def raport_alu(folder, cel_dir, wyniki, produkty):
-    """Raport tekstowy i CSV (dla Excela: srednik + UTF-8 z BOM) w folderze wynikowym."""
+    """Raport tekstowy (wszystkie zdjecia) + karteczka PNG (podsumowanie) w folderze wynikowym."""
     ile = len(wyniki)
     licz = {k: sum(1 for w in wyniki if w['status'] == k)
             for k in ('ok', 'niepewne', 'spoza', 'brak', 'blad')}
@@ -1342,17 +1366,92 @@ def raport_alu(folder, cel_dir, wyniki, produkty):
     with open(os.path.join(cel_dir, f'Raport {NAZWA}.txt'), 'w', encoding='utf-8') as f:
         f.write('\n'.join(L) + '\n')
 
-    def pole(x):
-        x = str(x)
-        return '"' + x.replace('"', '""') + '"' if any(c in x for c in ';"\n') else x
-    with open(os.path.join(cel_dir, f'Raport {NAZWA}.csv'), 'w', encoding='utf-8-sig') as f:
-        f.write('Produkt;Ilość;W tym niepewne\n')
-        for p in produkty:
-            f.write(f'{pole(p["produkt"])};{p["ile"]};{p["niepewne"]}\n')
-        f.write('\nZdjęcie;Nowa nazwa;Status;Produkt;Wydrukowany napis\n')
-        for w in wyniki:
-            f.write(';'.join(pole(x) for x in (w['stary'], w['nowy'], etyk[w['status']],
-                                               w.get('kod', ''), w.get('napis', ''))) + '\n')
+    try:
+        karteczka_alu(folder, ile, licz, produkty, os.path.join(cel_dir, f'Raport {NAZWA}.png'))
+    except Exception as e:
+        log(f'karteczka PNG nie zapisana: {type(e).__name__}: {e}')
+
+
+def czcionka(rozmiar, gruba=False):
+    """Systemowa czcionka z polskimi znakami — inne sciezki na macOS i Windows."""
+    from PIL import ImageFont
+    kandydaci = (['/System/Library/Fonts/Supplemental/Arial Bold.ttf',
+                  r'C:\Windows\Fonts\segoeuib.ttf', r'C:\Windows\Fonts\arialbd.ttf']
+                 if gruba else
+                 ['/System/Library/Fonts/Supplemental/Arial.ttf',
+                  r'C:\Windows\Fonts\segoeui.ttf', r'C:\Windows\Fonts\arial.ttf'])
+    for k in kandydaci + ['/Library/Fonts/Arial Unicode.ttf', 'DejaVuSans.ttf']:
+        try:
+            return ImageFont.truetype(k, rozmiar)
+        except OSError:
+            continue
+    return ImageFont.load_default(rozmiar)
+
+
+def karteczka_alu(folder, ile, licz, produkty, sciezka):
+    """Mala karteczka PNG z podsumowaniem: produkty z iloscia i ile rozpoznano.
+    Rysowana w 2x, zeby tekst byl ostry takze na ekranach Retina."""
+    from PIL import Image, ImageDraw
+    S = 2
+    W, pad = 560 * S, 30 * S
+    f_tyt, f_mal = czcionka(21 * S, True), czcionka(13 * S)
+    f_prod, f_ile = czcionka(16 * S), czcionka(16 * S, True)
+    wiersz = 30 * S
+    lista = produkty or [{'produkt': 'żaden produkt nie został rozpoznany', 'ile': '', 'niepewne': 0}]
+    H = pad + 34 * S + 22 * S + 20 * S + 26 * S + len(lista) * wiersz + 22 * S + 22 * S + pad
+
+    im = Image.new('RGB', (W, H), (238, 243, 249))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle([6 * S, 6 * S, W - 6 * S, H - 6 * S], radius=18 * S,
+                        fill=(255, 255, 255), outline=(214, 224, 236), width=S)
+    maska = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(maska).rounded_rectangle([6 * S, 6 * S, W - 6 * S, H - 6 * S], radius=18 * S, fill=255)
+    pasek = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(pasek).rectangle([0, 0, W, 12 * S], fill=255)
+    from PIL import ImageChops
+    im.paste((26, 128, 236), (0, 0), ImageChops.multiply(maska, pasek))
+    TXT, DIM, ACC = (23, 34, 46), (104, 120, 138), (20, 120, 220)
+
+    y = pad + 4 * S
+    d.text((pad, y), f'{NAZWA} · ALUPROF', font=f_tyt, fill=TXT)
+    y += 34 * S
+    nazwa = os.path.basename(folder.rstrip('/\\'))
+    d.text((pad, y), f'{nazwa}  ·  {time.strftime("%d.%m.%Y %H:%M")}', font=f_mal, fill=DIM)
+    y += 22 * S
+    nier = licz['brak'] + licz['blad']
+    podsum = f'rozpoznane {licz["ok"]} z {ile}'
+    if licz['niepewne']:
+        podsum += f'  ·  niepewne {licz["niepewne"]}'
+    if licz['spoza']:
+        podsum += f'  ·  spoza listy {licz["spoza"]}'
+    if nier:
+        podsum += f'  ·  nierozpoznane {nier}'
+    d.text((pad, y), podsum, font=f_mal, fill=(63, 157, 74) if not nier else (199, 116, 0))
+    y += 20 * S
+    d.line([pad, y + 8 * S, W - pad, y + 8 * S], fill=(226, 232, 240), width=S)
+    y += 26 * S
+
+    for i, p in enumerate(lista):
+        if i % 2 == 0:
+            d.rounded_rectangle([pad - 10 * S, y - 5 * S, W - pad + 10 * S, y + wiersz - 7 * S],
+                                radius=8 * S, fill=(244, 248, 253))
+        tekst = p['produkt'] + (f'  (niepewne {p["niepewne"]})' if p['niepewne'] else '')
+        while d.textlength(tekst, font=f_prod) > W - 2 * pad - 70 * S and len(tekst) > 4:
+            tekst = tekst[:-2].rstrip() + '…'
+        d.text((pad, y), tekst, font=f_prod, fill=TXT)
+        if p['ile'] != '':
+            ilosc = f'× {p["ile"]}'
+            d.text((W - pad - d.textlength(ilosc, font=f_ile), y), ilosc, font=f_ile, fill=ACC)
+        y += wiersz
+
+    y += 16 * S
+    razem = sum(p['ile'] for p in produkty)
+    n = len(produkty)
+    rodz = 'rodzaj' if n == 1 else ('rodzaje' if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14
+                                    else 'rodzajów')
+    d.text((pad, y), f'razem: {razem} szt. · {n} {rodz}' if produkty else '',
+           font=f_mal, fill=DIM)
+    im.save(sciezka, optimize=True)
 
 
 def przebieg_alu(folder, model, na_req, rpm):
@@ -1407,7 +1506,18 @@ def przebieg_alu(folder, model, na_req, rpm):
 
         # ── 3. odczyt przez Gemini ───────────────────────────────────────
         tempo, brak_limitu = Tempo(rpm), False
-        paczki = [male[i:i+na_req] for i in range(0, len(male), na_req)]
+        # base64 dokłada 1/3, a Gemini przyjmuje do 20 MB na zapytanie — dlatego obok
+        # liczby zdjec pilnujemy tez sumy bajtow (13 MB surowych = ~17,5 MB w zapytaniu)
+        paczki, biezaca, bajty = [], [], 0
+        for m in male:
+            r = os.path.getsize(m[2])
+            if biezaca and (len(biezaca) >= na_req or bajty + r > ALU_MAX_BAJTOW):
+                paczki.append(biezaca)
+                biezaca, bajty = [], 0
+            biezaca.append(m)
+            bajty += r
+        if biezaca:
+            paczki.append(biezaca)
         with BLOKADA:
             STAN.update(etap='odczyt', ile=len(paczki), zrobione=0)
         if paczki:
@@ -1423,7 +1533,8 @@ def przebieg_alu(folder, model, na_req, rpm):
             for (k, _, _), w in zip(paczka, wyn):
                 mapa[k] = w
             log(f'paczka {nr}/{len(paczki)}: ' + ', '.join(
-                (w['produkt'] or w['napis'] or '—') + ('?' if w['status'] != 'ok' else '')
+                (' + '.join(produkty_wyniku(w)) or w['napis'] or '—') +
+                ('?' if w['status'] != 'ok' else '')
                 for w in wyn))
             stan_alu_zapisz(folder, mapa)
             with BLOKADA:
@@ -1480,8 +1591,7 @@ def przebieg_alu(folder, model, na_req, rpm):
                 if not juz:
                     shutil.copy2(p, cel)    # kopia 1:1, oryginal nietkniety
                 wyniki.append({'stary': k, 'nowy': os.path.basename(cel), 'status': w['status'],
-                               'kod': ' + '.join([w['produkt']] + w.get('inne', []))
-                                      if w['produkt'] else '',
+                               'kod': ' + '.join(produkty_wyniku(w)),
                                'napis': w.get('napis', '')})
             except Exception as e:
                 log(f'nie udało się {k}: {e}')
@@ -1491,11 +1601,11 @@ def przebieg_alu(folder, model, na_req, rpm):
         for w in (mapa[k] for k, _ in wpisy if k in mapa):
             if w['status'] not in ('ok', 'niepewne'):
                 continue
-            for prod in [w['produkt']] + w.get('inne', []):
+            for prod in produkty_wyniku(w):
                 z = zest.setdefault(prod, {'produkt': prod, 'ile': 0, 'niepewne': 0})
                 z['ile'] += 1
                 z['niepewne'] += w['status'] == 'niepewne'
-        kolej = {p: i for i, p in enumerate(profile)}
+        kolej = {z_folia(p): i for i, p in enumerate(profile)}
         produkty = sorted(zest.values(), key=lambda z: (-z['ile'], kolej.get(z['produkt'], 1e9)))
         try:
             raport_alu(folder, cel_dir, wyniki, produkty)
@@ -1820,12 +1930,14 @@ body{margin:0; background:var(--page); color:var(--txt);
 .dol{flex:none; margin-top:auto; padding-top:12px}
 .dol button{margin-top:8px}
 .dol .err:empty{display:none}
-.podpis{flex:none; display:flex; align-items:center; justify-content:center; gap:10px;
+.podpis{flex:none; display:block; text-align:center;
   margin-top:16px; padding-top:12px; border-top:1px solid var(--line);
   font-size:11.5px; line-height:1.35; color:var(--dim)}
-.podpis .mak{width:38px; height:auto; flex:none; color:#CB2228}
-.podpis .autor{height:15px; width:auto; flex:none; color:var(--txt); opacity:.85;
-  margin:0 1px; transform:translateY(1px)}
+.podpis svg{display:inline-block; vertical-align:baseline}
+/* MAK: dol liter lezy na dole viewBoxu, wysokosc = wysokosc wersalikow tekstu */
+.podpis .mak{height:.72em; width:2.4em; color:#CB2228; margin-right:.45em}
+/* makarewicz: x-height znaku = x-height tekstu, dol ukosnika wystaje pod linie bazowa */
+.podpis .autor{height:.9em; width:5.62em; color:inherit; vertical-align:-.1435em}
 .podpis sup{font-size:.7em; vertical-align:super}
 .prawa{gap:0}
 .stopka{flex:none; margin-top:10px}
@@ -1977,10 +2089,26 @@ button.zielony{background:
 .podsum{display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 10px}
 .podtyt{font-size:11px; font-weight:590; text-transform:uppercase; letter-spacing:.04em;
   color:var(--dim); margin:12px 0 6px}
-.pole textarea{width:100%; min-height:150px; border:0; background:transparent; color:var(--txt);
-  font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; outline:none; resize:vertical}
-.pole label a{float:right; text-transform:none; letter-spacing:0; font-weight:400;
-  color:var(--acc); cursor:pointer}
+.profPole{display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+  transition:border-color .18s, background .18s}
+.profPole:hover{border-color:var(--acc); background:rgba(var(--accrgb),.07)}
+.profPole #uProfIle{font-size:15.5px}
+.profEdytuj{color:var(--acc); font-weight:590; font-size:15px}
+.profNarz{display:grid; grid-template-columns:1fr 1.6fr 46px; gap:8px; margin-bottom:12px}
+.profNarz .pole{margin-top:0}
+button.profPlus{margin:0; padding:0; font-size:24px; border-radius:13px}
+.profLista{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:6px;
+  max-height:46vh; overflow-y:auto; padding:2px 4px 2px 0}
+.prof{display:flex; align-items:center; gap:6px; padding:7px 8px 7px 11px; border-radius:10px;
+  background:var(--field); border:1px solid var(--line); font-size:13.5px; font-weight:560}
+.prof span{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.prof.nowy{border-color:rgba(var(--accrgb),.55); background:rgba(var(--accrgb),.09)}
+.prof .x{flex:none; cursor:pointer; color:var(--dim); font-size:16px; line-height:1;
+  padding:1px 5px; border-radius:6px}
+.prof .x:hover{color:var(--err); background:rgba(216,69,46,.13)}
+.profStopka{display:flex; justify-content:space-between; align-items:center; margin-top:12px;
+  font-size:13px}
+.profStopka a{color:var(--acc); cursor:pointer}
 .tylkoAlu{display:none}
 body.alu .tylkoAlu{display:block}
 body.alu .tylkoDepo{display:none}
@@ -2009,10 +2137,7 @@ body.alu .tylkoDepo{display:none}
         <div class="big" id="dropTxt">Wybierz zdjęcia</div>
       </div>
 
-      <div class="info tylkoAlu" id="aluInfo">Program przeszuka folder razem z podfolderami
-        i archiwami (.zip, .rar, .7z), skompresuje zdjęcia i rozpozna na nich
-        wydrukowane oznaczenia profili. Kopie z nazwami produktów i raport trafią
-        do nowego folderu „<i>nazwa folderu</i> MakroSkan”.</div>
+      <div class="info tylkoAlu" id="aluInfo"></div>
 
       <div class="naglowek" id="naglowek" style="display:none">
         <span id="ilePlikow"></span><a onclick="wyczysc(event)">wyczyść listę</a>
@@ -2045,14 +2170,9 @@ body.alu .tylkoDepo{display:none}
     </div>
   </div>
 
-  <div class="podpis">
-    <svg class="mak" viewBox="0 0 170 51" role="img" aria-label="MAK">
+  <div class="podpis"><svg class="mak" viewBox="0 0 170 51" role="img" aria-label="MAK">
       <path fill="currentColor" fill-rule="evenodd" d="M0.0,0.0 L0.0,50.92 L15.67,50.92 L15.92,49.58 L15.83,13.58 L16.42,12.92 L39.92,13.0 L42.25,13.25 L43.58,14.08 L45.0,15.67 L45.25,18.08 L45.25,48.33 L45.08,49.5 L45.42,50.92 L61.67,50.92 L61.92,49.75 L61.83,10.33 L60.67,5.75 L59.33,3.75 L57.58,2.08 L55.5,1.0 L53.42,0.75 L52.92,0.5 L52.67,0.0 Z M82.25,0.0 L82.33,1.08 L83.08,2.33 L83.17,3.42 L84.0,4.67 L84.17,5.83 L84.92,7.08 L85.17,8.42 L85.83,9.5 L86.08,10.75 L86.75,11.67 L87.0,13.25 L87.75,14.58 L87.83,15.42 L89.08,18.08 L89.08,18.58 L88.58,19.0 L75.67,18.92 L75.33,19.17 L74.25,21.75 L74.25,22.25 L73.42,24.67 L73.42,25.25 L72.75,26.75 L72.58,28.17 L71.83,29.67 L71.67,31.17 L71.0,32.42 L70.83,33.75 L70.17,35.0 L69.83,36.92 L69.08,38.33 L69.0,39.67 L68.25,40.92 L68.0,42.75 L67.5,43.67 L67.17,45.25 L66.5,46.75 L66.25,48.25 L65.58,49.58 L65.83,50.92 L117.92,50.92 L117.75,48.83 L117.0,47.33 L116.67,45.83 L116.08,45.0 L115.83,43.5 L115.08,42.25 L114.83,40.67 L114.0,39.33 L114.0,38.5 L113.33,37.33 L113.0,35.75 L112.33,34.42 L112.25,33.58 L111.75,32.58 L110.58,28.67 L109.92,27.58 L109.67,26.08 L108.92,24.75 L108.83,23.58 L108.0,22.33 L107.75,20.67 L107.17,19.83 L106.83,18.33 L106.17,17.17 L106.0,16.08 L105.25,14.5 L105.17,13.58 L104.42,12.17 L103.42,8.58 L102.83,7.5 L102.67,6.42 L101.92,5.0 L101.75,3.58 L100.92,2.42 L100.92,1.5 L100.33,0.0 Z M139.42,0.0 L139.33,0.58 L136.83,3.5 L133.25,7.17 L129.92,11.25 L126.0,15.33 L121.0,21.17 L120.75,21.75 L120.75,32.5 L121.25,33.42 L124.0,36.25 L128.25,41.17 L137.08,50.42 L137.17,50.92 L159.58,50.92 L159.5,50.25 L159.0,49.33 L157.58,48.08 L148.83,38.83 L135.67,25.58 L135.92,24.75 L138.92,21.67 L143.0,16.75 L146.17,13.5 L150.0,8.92 L157.08,1.25 L157.67,0.33 L157.67,0.0 Z M22.33,19.08 L21.92,19.58 L21.92,49.83 L22.17,50.92 L38.75,50.92 L39.0,49.42 L39.0,20.58 L38.83,19.42 L38.33,19.0 Z M90.17,24.0 L90.75,24.08 L91.08,24.5 L91.25,25.83 L92.83,29.0 L93.17,30.33 L93.92,31.42 L94.0,32.25 L94.83,33.58 L95.0,34.67 L95.67,35.75 L96.58,38.25 L97.25,39.25 L97.25,39.67 L96.75,40.08 L85.92,40.08 L85.33,39.67 L85.33,39.25 L85.83,38.42 L85.92,37.33 L86.67,36.0 L86.92,34.0 L87.67,32.5 L87.67,31.58 L89.08,27.33 L89.5,24.92 Z M163.83,0.0 L163.83,0.58 L163.0,1.08 L162.0,2.08 L161.75,2.92 L161.17,3.67 L161.17,4.58 L161.83,5.67 L162.0,6.58 L163.33,7.92 L164.42,8.08 L165.5,8.83 L166.17,8.83 L167.17,8.08 L168.25,7.75 L169.33,6.33 L169.92,6.25 L169.92,2.0 L169.42,1.92 L168.67,0.92 L168.17,0.75 L167.83,0.42 L167.83,0.0 Z M164.33,0.83 L166.75,0.83 L167.25,1.0 L167.75,1.75 L168.92,2.75 L169.08,3.17 L169.08,5.5 L168.92,5.92 L166.42,7.75 L165.17,7.58 L163.67,6.67 L162.0,4.58 L162.08,3.83 L162.67,3.25 L162.92,2.25 L163.75,1.67 L163.92,1.17 Z M164.5,2.25 L163.92,3.33 L164.08,5.75 L164.58,5.83 L165.5,4.92 L166.42,5.75 L166.83,5.67 L167.0,5.25 L166.75,4.25 L167.33,3.58 L167.17,3.08 L166.58,2.33 L166.17,2.17 Z"/>
-    </svg>
-    <span>Stworzono w Makro-Plast<sup>&reg;</sup> przez</span>
-    <svg class="autor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5719.33 916" role="img" aria-label="makarewicz"><g transform="translate(-65 770) scale(1 -1)" fill="currentColor"><path d="M65 0V526H167L177 456H184Q201 480 223 498.5Q245 517 273.5 527.5Q302 538 336 538Q382 538 418 519Q454 500 474 456H481Q498 480 521 498.5Q544 517 574 527.5Q604 538 639 538Q686 538 722 521Q758 504 779 465Q800 426 800 361V0H678V336Q678 363 672 381.5Q666 400 655.5 410.5Q645 421 629.5 426Q614 431 596 431Q567 431 544 415Q521 399 507.5 371Q494 343 494 306V0H372V336Q372 363 366 381.5Q360 400 349.5 410.5Q339 421 323.5 426Q308 431 290 431Q261 431 237.5 415Q214 399 200.5 371Q187 343 187 306V0Z"/><path transform="translate(841 0)" d="M200 -12Q178 -12 149.5 -6.5Q121 -1 94.5 14Q68 29 51 58.5Q34 88 34 136Q34 190 58 225.5Q82 261 125.5 281.5Q169 302 229.5 310.5Q290 319 362 319V362Q362 385 355 403Q348 421 329.5 431.5Q311 442 274 442Q237 442 216 433Q195 424 187 411Q179 398 179 384V370H61Q60 375 60 380Q60 385 60 392Q60 437 87 470Q114 503 162 520.5Q210 538 273 538Q345 538 391.5 518Q438 498 461 461Q484 424 484 371V123Q484 104 495 96Q506 88 519 88H551V4Q541 0 522 -5.5Q503 -11 475 -11Q449 -11 428.5 -2.5Q408 6 394 22Q380 38 374 60H368Q351 39 327.5 22.5Q304 6 272.5 -3Q241 -12 200 -12ZM237 88Q267 88 290.5 97Q314 106 329.5 122Q345 138 353.5 161Q362 184 362 211V235Q307 235 260.5 228Q214 221 186.5 202Q159 183 159 148Q159 130 167.5 116.5Q176 103 193.5 95.5Q211 88 237 88Z"/><path transform="translate(1377 0)" d="M65 0V723H187V302L376 526H519L343 322L529 0H389L265 233L187 158V0Z"/><path transform="translate(1900 0)" d="M200 -12Q178 -12 149.5 -6.5Q121 -1 94.5 14Q68 29 51 58.5Q34 88 34 136Q34 190 58 225.5Q82 261 125.5 281.5Q169 302 229.5 310.5Q290 319 362 319V362Q362 385 355 403Q348 421 329.5 431.5Q311 442 274 442Q237 442 216 433Q195 424 187 411Q179 398 179 384V370H61Q60 375 60 380Q60 385 60 392Q60 437 87 470Q114 503 162 520.5Q210 538 273 538Q345 538 391.5 518Q438 498 461 461Q484 424 484 371V123Q484 104 495 96Q506 88 519 88H551V4Q541 0 522 -5.5Q503 -11 475 -11Q449 -11 428.5 -2.5Q408 6 394 22Q380 38 374 60H368Q351 39 327.5 22.5Q304 6 272.5 -3Q241 -12 200 -12ZM237 88Q267 88 290.5 97Q314 106 329.5 122Q345 138 353.5 161Q362 184 362 211V235Q307 235 260.5 228Q214 221 186.5 202Q159 183 159 148Q159 130 167.5 116.5Q176 103 193.5 95.5Q211 88 237 88Z"/><path transform="translate(2436 0)" d="M65 0V526H167L177 443H184Q194 468 208.5 489.5Q223 511 246 524.5Q269 538 302 538Q318 538 331.5 535Q345 532 352 529V414H315Q284 414 260 405.5Q236 397 219.5 379Q203 361 195 334Q187 307 187 271V0Z"/><path transform="translate(2778 0)" d="M291 -12Q207 -12 151 17.5Q95 47 67 108Q39 169 39 263Q39 358 67 418.5Q95 479 151 508.5Q207 538 291 538Q367 538 418.5 509.5Q470 481 496 422Q522 363 522 269V233H164Q166 184 179 150.5Q192 117 219.5 100.5Q247 84 292 84Q315 84 335 90Q355 96 370 108.5Q385 121 393.5 140Q402 159 402 184H522Q522 134 504.5 97Q487 60 455.5 36Q424 12 382 0Q340 -12 291 -12ZM166 319H395Q395 352 387.5 375Q380 398 366.5 413Q353 428 334 434.5Q315 441 291 441Q252 441 225.5 428Q199 415 185 388Q171 361 166 319Z"/><path transform="translate(3319 0)" d="M160 0 3 526H129L202 240Q208 218 212 196.5Q216 175 219 160Q222 145 223 142H229Q233 160 237 181Q241 202 244.5 219.5Q248 237 249 243L317 526H448L519 242Q523 228 526.5 209.5Q530 191 534 173Q538 155 540 142H546Q548 154 551.5 171Q555 188 559 206Q563 224 566 239L638 526H755L599 0H470L410 251Q406 270 400.5 294Q395 318 390.5 342Q386 366 383 383H377Q377 376 374 358Q371 340 365.5 313Q360 286 351 251L289 0Z"/><path transform="translate(4057 0)" d="M65 607V723H187V607ZM65 0V526H187V0Z"/><path transform="translate(4289 0)" d="M284 -12Q202 -12 147.5 17.5Q93 47 66 108Q39 169 39 263Q39 358 66.5 418.5Q94 479 148.5 508.5Q203 538 284 538Q337 538 378 525Q419 512 448.5 485.5Q478 459 493 420Q508 381 508 329H384Q384 366 373 390Q362 414 339.5 426.5Q317 439 282 439Q241 439 215 420Q189 401 176.5 363.5Q164 326 164 269V256Q164 200 176.5 162Q189 124 216 105.5Q243 87 287 87Q321 87 343.5 99.5Q366 112 378 137Q390 162 390 197H508Q508 148 493 109Q478 70 449 43Q420 16 378.5 2Q337 -12 284 -12Z"/><path d="M4840 0 4840 57 5106 426 4857 426 4857 526 5313.33 526 5284 470 5017 100 5205.38 100 5153 0Z"/><path d="M5144.53 -146 5624.33 770 5784.33 770 5304.53 -146Z"/></g></svg>
-    <span>&nbsp;|&nbsp; ver. <span id="wersjaStopka">—</span></span>
-  </div>
+    </svg>Stworzono w Makro-Plast<sup>&reg;</sup> przez <svg class="autor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5719.33 916" role="img" aria-label="makarewicz"><g transform="translate(-65 770) scale(1 -1)" fill="currentColor"><path d="M65 0V526H167L177 456H184Q201 480 223 498.5Q245 517 273.5 527.5Q302 538 336 538Q382 538 418 519Q454 500 474 456H481Q498 480 521 498.5Q544 517 574 527.5Q604 538 639 538Q686 538 722 521Q758 504 779 465Q800 426 800 361V0H678V336Q678 363 672 381.5Q666 400 655.5 410.5Q645 421 629.5 426Q614 431 596 431Q567 431 544 415Q521 399 507.5 371Q494 343 494 306V0H372V336Q372 363 366 381.5Q360 400 349.5 410.5Q339 421 323.5 426Q308 431 290 431Q261 431 237.5 415Q214 399 200.5 371Q187 343 187 306V0Z"/><path transform="translate(841 0)" d="M200 -12Q178 -12 149.5 -6.5Q121 -1 94.5 14Q68 29 51 58.5Q34 88 34 136Q34 190 58 225.5Q82 261 125.5 281.5Q169 302 229.5 310.5Q290 319 362 319V362Q362 385 355 403Q348 421 329.5 431.5Q311 442 274 442Q237 442 216 433Q195 424 187 411Q179 398 179 384V370H61Q60 375 60 380Q60 385 60 392Q60 437 87 470Q114 503 162 520.5Q210 538 273 538Q345 538 391.5 518Q438 498 461 461Q484 424 484 371V123Q484 104 495 96Q506 88 519 88H551V4Q541 0 522 -5.5Q503 -11 475 -11Q449 -11 428.5 -2.5Q408 6 394 22Q380 38 374 60H368Q351 39 327.5 22.5Q304 6 272.5 -3Q241 -12 200 -12ZM237 88Q267 88 290.5 97Q314 106 329.5 122Q345 138 353.5 161Q362 184 362 211V235Q307 235 260.5 228Q214 221 186.5 202Q159 183 159 148Q159 130 167.5 116.5Q176 103 193.5 95.5Q211 88 237 88Z"/><path transform="translate(1377 0)" d="M65 0V723H187V302L376 526H519L343 322L529 0H389L265 233L187 158V0Z"/><path transform="translate(1900 0)" d="M200 -12Q178 -12 149.5 -6.5Q121 -1 94.5 14Q68 29 51 58.5Q34 88 34 136Q34 190 58 225.5Q82 261 125.5 281.5Q169 302 229.5 310.5Q290 319 362 319V362Q362 385 355 403Q348 421 329.5 431.5Q311 442 274 442Q237 442 216 433Q195 424 187 411Q179 398 179 384V370H61Q60 375 60 380Q60 385 60 392Q60 437 87 470Q114 503 162 520.5Q210 538 273 538Q345 538 391.5 518Q438 498 461 461Q484 424 484 371V123Q484 104 495 96Q506 88 519 88H551V4Q541 0 522 -5.5Q503 -11 475 -11Q449 -11 428.5 -2.5Q408 6 394 22Q380 38 374 60H368Q351 39 327.5 22.5Q304 6 272.5 -3Q241 -12 200 -12ZM237 88Q267 88 290.5 97Q314 106 329.5 122Q345 138 353.5 161Q362 184 362 211V235Q307 235 260.5 228Q214 221 186.5 202Q159 183 159 148Q159 130 167.5 116.5Q176 103 193.5 95.5Q211 88 237 88Z"/><path transform="translate(2436 0)" d="M65 0V526H167L177 443H184Q194 468 208.5 489.5Q223 511 246 524.5Q269 538 302 538Q318 538 331.5 535Q345 532 352 529V414H315Q284 414 260 405.5Q236 397 219.5 379Q203 361 195 334Q187 307 187 271V0Z"/><path transform="translate(2778 0)" d="M291 -12Q207 -12 151 17.5Q95 47 67 108Q39 169 39 263Q39 358 67 418.5Q95 479 151 508.5Q207 538 291 538Q367 538 418.5 509.5Q470 481 496 422Q522 363 522 269V233H164Q166 184 179 150.5Q192 117 219.5 100.5Q247 84 292 84Q315 84 335 90Q355 96 370 108.5Q385 121 393.5 140Q402 159 402 184H522Q522 134 504.5 97Q487 60 455.5 36Q424 12 382 0Q340 -12 291 -12ZM166 319H395Q395 352 387.5 375Q380 398 366.5 413Q353 428 334 434.5Q315 441 291 441Q252 441 225.5 428Q199 415 185 388Q171 361 166 319Z"/><path transform="translate(3319 0)" d="M160 0 3 526H129L202 240Q208 218 212 196.5Q216 175 219 160Q222 145 223 142H229Q233 160 237 181Q241 202 244.5 219.5Q248 237 249 243L317 526H448L519 242Q523 228 526.5 209.5Q530 191 534 173Q538 155 540 142H546Q548 154 551.5 171Q555 188 559 206Q563 224 566 239L638 526H755L599 0H470L410 251Q406 270 400.5 294Q395 318 390.5 342Q386 366 383 383H377Q377 376 374 358Q371 340 365.5 313Q360 286 351 251L289 0Z"/><path transform="translate(4057 0)" d="M65 607V723H187V607ZM65 0V526H187V0Z"/><path transform="translate(4289 0)" d="M284 -12Q202 -12 147.5 17.5Q93 47 66 108Q39 169 39 263Q39 358 66.5 418.5Q94 479 148.5 508.5Q203 538 284 538Q337 538 378 525Q419 512 448.5 485.5Q478 459 493 420Q508 381 508 329H384Q384 366 373 390Q362 414 339.5 426.5Q317 439 282 439Q241 439 215 420Q189 401 176.5 363.5Q164 326 164 269V256Q164 200 176.5 162Q189 124 216 105.5Q243 87 287 87Q321 87 343.5 99.5Q366 112 378 137Q390 162 390 197H508Q508 148 493 109Q478 70 449 43Q420 16 378.5 2Q337 -12 284 -12Z"/><path d="M4840 0 4840 57 5106 426 4857 426 4857 526 5313.33 526 5284 470 5017 100 5205.38 100 5153 0Z"/><path d="M5144.53 -146 5624.33 770 5784.33 770 5304.53 -146Z"/></g></svg>&nbsp;&nbsp;|&nbsp; ver. <span id="wersjaStopka">—</span></div>
 
 <div class="modal" id="modalAkt">
   <div class="modalKarta" style="max-width:430px; text-align:center">
@@ -2065,6 +2185,27 @@ body.alu .tylkoDepo{display:none}
     <button class="zielony" id="aktPobierz">Zaktualizuj i uruchom ponownie</button>
     <button class="ghost" id="aktPozniej"
             onclick="$('modalAkt').classList.remove('on')">Później</button>
+  </div>
+</div>
+
+<div class="modal" id="modalProf">
+  <div class="modalKarta" style="max-width:760px">
+    <div class="modalTyt">Profile ALUPROF<span class="wers" id="profIle"></span></div>
+    <div class="profNarz">
+      <div class="pole"><input id="profSzukaj" placeholder="Szukaj…" spellcheck="false"
+        oninput="profRysuj()"></div>
+      <div class="pole"><input id="profNowy" placeholder="Dodaj profil (można wkleić kilka linii)"
+        spellcheck="false" onkeydown="if(event.key==='Enter')profDodaj()"
+        onpaste="setTimeout(profDodaj, 0)"></div>
+      <button class="profPlus" onclick="profDodaj()" title="Dodaj">+</button>
+    </div>
+    <div class="profLista" id="profLista"></div>
+    <div class="profStopka">
+      <a onclick="profDomyslne()">przywróć wbudowaną listę</a>
+      <span class="info" id="profInfo" style="margin:0"></span>
+    </div>
+    <button onclick="profZapisz()">Zapisz listę</button>
+    <button class="ghost" onclick="$('modalProf').classList.remove('on')">Anuluj</button>
   </div>
 </div>
 
@@ -2092,9 +2233,9 @@ body.alu .tylkoDepo{display:none}
         <input id="uNaReqAlu" type="number" min="1" max="30"></div>
     </div>
 
-    <div class="pole"><label>Lista profili ALUPROF <span id="uProfIle"></span>
-        <a onclick="profDomyslne()">przywróć wbudowaną</a></label>
-      <textarea id="uProfile" spellcheck="false" placeholder="jedna pozycja w linii"></textarea></div>
+    <div class="pole profPole" onclick="profOtworz()">
+      <div><label>Lista profili ALUPROF</label><span id="uProfIle">—</span></div>
+      <span class="profEdytuj">Edytuj ›</span></div>
 
     <button class="ghost" onclick="akt()">Sprawdź aktualizacje</button>
     <div class="info" id="uInfo"></div>
@@ -2234,8 +2375,7 @@ function ustWczytaj(pokazJesliBrak){
     $('uNaReq').value = U.na_req;
     $('uRpm').value   = U.rpm;
     $('uNaReqAlu').value = U.na_req_alu;
-    $('uProfile').value  = U.profile_tekst || '';
-    $('uProfIle').textContent = '· ' + U.profile_ile + (U.profile_wlasne ? ' · własna' : '');
+    profEtykieta(U);
     if (!TIK) ustawTryb(U.tryb === 'alu' ? 'alu' : 'depo', false);
     $('wers').textContent = 'v' + U.wersja;
     $('wersjaStopka').textContent = U.wersja;
@@ -2256,17 +2396,64 @@ function ustWczytaj(pokazJesliBrak){
   });
 }
 function ustOtworz(){ $('modal').classList.add('on'); }
-// czyszczymy pole — przy zapisie pusta lista oznacza wbudowana
-function profDomyslne(){ $('uProfile').value = ''; ustZapisz(); }
+// ── lista profili ALUPROF (osobne okno) ─────────────────────────────────
+let PROF = [], PROF_NOWE = new Set();
+function profEtykieta(U){
+  $('uProfIle').textContent = odm(U.profile_ile, 'pozycja', 'pozycje', 'pozycji') +
+    (U.profile_wlasne ? ' · lista własna' : ' · lista wbudowana');
+}
+function profOtworz(){
+  PROF = (UST.profile_tekst || '').split('\n').filter(x => x.trim());
+  PROF_NOWE = new Set();
+  $('profSzukaj').value = ''; $('profNowy').value = ''; $('profInfo').textContent = '';
+  profRysuj();
+  $('modalProf').classList.add('on');
+  setTimeout(() => $('profNowy').focus(), 50);
+}
+function profRysuj(){
+  const q = $('profSzukaj').value.trim().toLowerCase(), box = $('profLista');
+  box.innerHTML = '';
+  const widoczne = PROF.map((p, i) => [p, i]).filter(([p]) => !q || p.toLowerCase().includes(q));
+  widoczne.forEach(([p, i]) => {
+    const d = document.createElement('div');
+    d.className = 'prof' + (PROF_NOWE.has(p) ? ' nowy' : '');
+    d.innerHTML = '<span></span><span class="x" title="Usuń">×</span>';
+    d.firstChild.textContent = p; d.firstChild.title = p;
+    d.lastChild.onclick = () => { PROF.splice(i, 1); profRysuj(); };
+    box.appendChild(d);
+  });
+  if (!widoczne.length) box.innerHTML = '<div class="pusto">nic nie pasuje</div>';
+  $('profIle').textContent = odm(PROF.length, 'pozycja', 'pozycje', 'pozycji') +
+    (q ? ' · pasuje ' + widoczne.length : '');
+}
+function profDodaj(){
+  const nowe = $('profNowy').value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  let dodane = 0;
+  nowe.forEach(p => { if (!PROF.includes(p)){ PROF.unshift(p); PROF_NOWE.add(p); dodane++; } });
+  $('profNowy').value = '';
+  $('profInfo').textContent = nowe.length ? (dodane ? 'dodano ' + dodane : 'już jest na liście') : '';
+  profRysuj();
+}
+function profZapisz(){
+  post('/api/ustawienia', {zapisz: 1, profile: PROF.join('\n')}).then(U => {
+    UST = U; profEtykieta(U);
+    $('modalProf').classList.remove('on');
+  });
+}
+// pusta lista przy zapisie oznacza wbudowana
+function profDomyslne(){
+  post('/api/ustawienia', {zapisz: 1, profile: ''}).then(U => {
+    UST = U; profEtykieta(U); profOtworz();
+    $('profInfo').textContent = 'przywrócono wbudowaną listę';
+  });
+}
 function ustZamknij(){ $('modal').classList.remove('on'); }
 function ustZapisz(){
   post('/api/ustawienia', {zapisz: 1, klucz: $('uKlucz').value.trim(),
     model: $('uModel').value, na_req: +$('uNaReq').value,
-    rpm: +$('uRpm').value, na_req_alu: +$('uNaReqAlu').value || 10,
-    profile: $('uProfile').value}).then(U => {
+    rpm: +$('uRpm').value, na_req_alu: +$('uNaReqAlu').value || 30}).then(U => {
     UST = U;
-    $('uProfile').value = U.profile_tekst || '';
-    $('uProfIle').textContent = '· ' + U.profile_ile + (U.profile_wlasne ? ' · własna' : '');
+    profEtykieta(U);
     if (U.ma_klucz){ modele(); $('powiad').classList.remove('on'); ustZamknij(); }
     else { $('powiad').textContent = 'Klucz jest pusty — bez niego nic nie odczytam.';
            $('powiad').classList.add('on'); }
@@ -2429,7 +2616,7 @@ $('uRpm').oninput    = () => UST.rpm    = +$('uRpm').value;
 ustWczytaj(true);          // pierwszy start otworzy Ustawienia
 aktStart();                // ciche sprawdzenie aktualizacji
 
-const ALU_INFO = $('aluInfo').innerHTML;
+const ALU_INFO = '';
 
 // Wiersz wynikow: plakietka + tekst + dopisek z prawej. Tekst wstawiamy jako tekst,
 // nie HTML — nazwy plikow i napisy z AI moga zawierac cokolwiek.
@@ -2504,6 +2691,11 @@ def wolny_port():
 
 
 def main():
+    d = cfg_wczytaj()
+    if not d.get('mig_alu30'):
+        # 1.2.0 zapisywala 10 zdjec ALUPROF w zapytaniu; od 1.2.1 domyslnie 30
+        cfg_zapisz({'mig_alu30': True,
+                    **({'na_req_alu': 30} if d.get('na_req_alu') == 10 else {})})
     port = wolny_port()
     try:
         import webview
