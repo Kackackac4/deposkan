@@ -36,7 +36,7 @@ import numpy as np
 # ══════════════════════════════════════════════════════════════════════════
 #  USTAWIENIA
 # ══════════════════════════════════════════════════════════════════════════
-WERSJA = '1.3.0'
+WERSJA = '1.3.1'
 NAZWA  = 'MakroSkan'
 REPO   = 'Kackackac4/deposkan'      # do sprawdzania aktualizacji na GitHubie
 # Pliki wydania (DEPOSKAN.exe, DEPOSKAN-macOS.zip) i katalog ustawien zostaja pod stara
@@ -1880,6 +1880,13 @@ class H(http.server.BaseHTTPRequestHandler):
         if path == '/api/wybierz':
             p = okno_wyboru()
             return {'pliki': p, 'folder': os.path.dirname(p[0]) if p else ''}
+        if path == '/api/wybierz_folder_depo':
+            # DEPO: caly folder z dnia naraz — wszystkie zdjecia z niego (bez podfolderow,
+            # wiec "Kopia z kodami" z poprzedniego przebiegu nie wraca na liste)
+            f = wybierz_folder().rstrip('/\\')
+            if not f or not os.path.isdir(f):
+                return {'folder': ''}
+            return {'folder': f, 'nazwa': os.path.basename(f), 'pliki': rozwin([f])}
         if path == '/api/wybierz_folder':
             f = wybierz_folder().rstrip('/\\')
             if not f or not os.path.isdir(f):
@@ -2254,6 +2261,7 @@ body.alu .tylkoDepo{display:none}
       </div>
 
       <div class="info tylkoAlu" id="aluInfo"></div>
+      <div class="info tylkoDepo" id="depoInfo"></div>
 
       <div class="naglowek" id="naglowek" style="display:none">
         <span id="ilePlikow"></span><a onclick="wyczysc(event)">wyczyść listę</a>
@@ -2364,7 +2372,7 @@ body.alu .tylkoDepo{display:none}
 </div>
 </div>
 <script>
-let PLIKI = [], TIK = null, UST = {}, TRYB = 'depo', FOLDER = null;
+let PLIKI = [], TIK = null, UST = {}, TRYB = 'depo', FOLDER = null, FOLDER_DEPO = null;
 const $ = id => document.getElementById(id);
 const post = (p, d) => fetch(p, {method:'POST', headers:{'Content-Type':'application/json'},
   body: JSON.stringify(d||{})}).then(r => r.json());
@@ -2397,16 +2405,16 @@ function wybierzFolder(){
   });
 }
 
-// Kolejne klikniecia DOKLADAJA pliki do listy, nie kasuja jej.
+// DEPO i ALUPROF: wybiera sie caly folder, program bierze z niego wszystkie zdjecia
 function dodaj(){
   if (TRYB === 'alu') return wybierzFolder();
-  post('/api/wybierz').then(d => {
+  post('/api/wybierz_folder_depo').then(d => {
     if (d.error) { $('err').textContent = d.error; return; }
+    if (!d.folder) return;                       // anulowano okno
     $('err').textContent = '';
-    const przed = PLIKI.length;
-    (d.pliki || []).forEach(p => { if (!PLIKI.includes(p)) PLIKI.push(p); });
-    if (PLIKI.length === przed && (d.pliki||[]).length)
-      $('err').textContent = 'te pliki już są na liście';
+    FOLDER_DEPO = d;
+    PLIKI = d.pliki || [];
+    if (!PLIKI.length) $('err').textContent = 'w tym folderze nie ma zdjęć';
     rysuj();
   });
 }
@@ -2440,24 +2448,23 @@ function rysuj(){
     $('go').disabled = !(FOLDER.zdjecia || FOLDER.archiwa);
     return;
   }
-  if (!PLIKI.length){
-    box.classList.remove('on'); nag.style.display = 'none';
-    $('dropTxt').textContent = 'Wybierz zdjęcia';
+  box.classList.remove('on'); nag.style.display = 'none';
+  if (!FOLDER_DEPO){
+    $('dropTxt').textContent = 'Wybierz folder';
+    $('depoInfo').innerHTML = '';
     $('go').disabled = true; return;
   }
-  box.classList.add('on'); nag.style.display = 'flex';
-  $('dropTxt').textContent = PLIKI.length + ' ' +
-    (PLIKI.length === 1 ? 'zdjęcie' : (PLIKI.length < 5 ? 'zdjęcia' : 'zdjęć'));
-  $('ilePlikow').textContent = PLIKI.length + ' na liscie';
-  PLIKI.forEach((p, i) => {
-    const d = document.createElement('div');
-    d.className = 'plik';
-    d.innerHTML = '<span class="nz"></span><span class="x">×</span>';
-    d.querySelector('.nz').textContent = p.split('/').pop();
-    d.querySelector('.x').onclick = e => usun(i, e);
-    box.appendChild(d);
-  });
-  $('go').disabled = false;
+  $('dropTxt').textContent = FOLDER_DEPO.nazwa;
+  $('depoInfo').innerHTML = '';
+  const t = document.createElement('div');
+  t.textContent = odm(PLIKI.length, 'zdjęcie', 'zdjęcia', 'zdjęć');
+  t.style.cssText = 'color:var(--txt); font-weight:590';
+  const f = document.createElement('div');
+  f.textContent = FOLDER_DEPO.folder; f.style.cssText = 'overflow-wrap:anywhere';
+  const w = document.createElement('div');
+  w.textContent = 'wyniki: podfolder „Kopia z kodami”';
+  $('depoInfo').append(t, f, w);
+  $('go').disabled = !PLIKI.length;
 }
 const pokaz = () => post('/api/pokaz', {});
 
@@ -2466,7 +2473,7 @@ function odswiez(){
   post('/api/reset').then(d => {
     if (d.error) { $('err').textContent = d.error; return; }
     if (TIK) { clearInterval(TIK); TIK = null; }
-    PLIKI = []; FOLDER = null;
+    PLIKI = []; FOLDER = null; FOLDER_DEPO = null;
     $('aluInfo').innerHTML = ALU_INFO;
     $('err').textContent = '';
     $('log').textContent = '';

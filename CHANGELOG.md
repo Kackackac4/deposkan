@@ -19,6 +19,15 @@ Nic w toku.
 
 ---
 
+## [1.3.1] — 2026-09-21
+
+### Zmienione
+
+- **DEPO: wybiera się folder, nie pojedyncze zdjęcia.** Program bierze wszystkie zdjęcia
+  z folderu naraz (bez podfolderów, więc „Kopia z kodami” z poprzedniego przebiegu nie
+  wraca na listę). Wyniki jak dotąd w podfolderze „Kopia z kodami”.
+
+
 ## [1.3.0] — 2026-09-21
 
 ### Poprawione
