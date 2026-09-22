@@ -15,7 +15,19 @@ GitHub Actions zbuduje wtedy `.app` i `.exe` i utworzy Release.
 
 ## [Niewydane]
 
-Nic w toku.
+### Dodane
+
+- **ALUPROF: oznaczenia na karteczce PNG.** Wariant profilu i dopiski widać teraz bez
+  czytania całego oznaczenia:
+  - `/02` — błękitna poświata pod nazwą profilu, `/08` — jasnobrązowa. Profile bez
+    wariantu (np. `ZHLDMZN/20`) zostają bez poświaty; wykrywanie wymaga `/02` lub `/08`
+    bez cyfry po nich, żeby `/20` się nie łapało.
+  - dopisek **Folia** na pomarańczowo,
+  - dopisek **pak** / **pak.** w plakietce w kolorze folii bąbelkowej, z fakturą bąbelków.
+
+  Poświata idzie tylko pod samym oznaczeniem profilu, nie pod całą linią — gdy świeciła
+  pod wszystkim, zagłuszała „Folię” i plakietkę. Jest celowo blada: przy mocniejszym
+  kryciu na białym tle czyta się jak plama, a nie jak łuna.
 
 ---
 

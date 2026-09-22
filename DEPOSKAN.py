@@ -1481,10 +1481,79 @@ def czcionka(rozmiar, gruba=False):
     return ImageFont.load_default(rozmiar)
 
 
+# Oznaczenia na karteczce. Wariant profilu (/02 albo /08) ma byc widoczny na pierwszy
+# rzut oka, bez czytania calego oznaczenia — stad poswiata w tle nazwy. "/20" i podobne
+# nie moga sie lapac, dlatego po cyfrach nie moze byc kolejnej.
+WARIANT = re.compile(r'/0([28])(?!\d)')
+POSW_02 = (86, 176, 255)        # blekit
+POSW_08 = (214, 166, 104)       # jasny braz
+POMARANCZ = (230, 126, 20)      # dopisek "Folia"
+BABEL_TLO, BABEL_RAMKA, BABEL_TEKST = (214, 235, 247), (118, 171, 203), (28, 92, 128)
+BABEL_BABELEK = (170, 208, 232)  # babelki: ledwo ciemniejsze od tla plakietki
+
+
+def poswiata_wariantu(tekst):
+    """Kolor poswiaty wg wariantu profilu albo None, gdy profil go nie ma."""
+    m = WARIANT.search(tekst)
+    return None if not m else (POSW_02 if m.group(1) == '2' else POSW_08)
+
+
+def samo_oznaczenie(tekst):
+    """Oznaczenie profilu bez dopiskow. Poswiata idzie tylko pod nim — to ono ma
+    wariant /02 albo /08, a "Folia" i "pak" maja wlasne oznaczenia, ktore halo
+    by zagluszylo."""
+    czesci = re.split(r'(\s+)', tekst)
+    out = []
+    for c in czesci:
+        if c.lower() == 'folia' or re.fullmatch(r'pak\.?', c, re.I) or c.startswith('('):
+            break
+        out.append(c)
+    return ''.join(out).rstrip()
+
+
+def rysuj_pak(d, x, y, tekst, font, S):
+    """Dopisek "pak" w obwodce w kolorze folii babelkowej. Babelki rysujemy siatka
+    na calej wysokosci plakietki — maja czytac sie jako faktura, nie rzadek kolek,
+    dlatego sa jasne i idzie po nich tekst."""
+    m = 3 * S
+    l, g, p, dol = d.textbbox((x, y), tekst, font=font)
+    l, g, p, dol = l - m, g - m, p + m, dol + m
+    d.rounded_rectangle([l, g, p, dol], radius=5 * S, fill=BABEL_TLO,
+                        outline=BABEL_RAMKA, width=S)
+    r, krok = 2 * S, 5 * S
+    by = g + 2 * S
+    while by + 2 * r <= dol - S:
+        bx = l + 2 * S + (krok // 2 if ((by - g) // krok) % 2 else 0)
+        while bx + 2 * r <= p - 2 * S:
+            d.ellipse([bx, by, bx + 2 * r, by + 2 * r], outline=BABEL_BABELEK,
+                      width=max(1, S // 2))
+            bx += krok
+        by += krok
+    d.text((x, y), tekst, font=font, fill=BABEL_TEKST)
+
+
+def rysuj_nazwe(d, x, y, tekst, font, S, kolor_txt):
+    """Nazwa produktu rysowana po kawalkach: "Folia" na pomaranczowo, "pak" w obwodce
+    jak folia babelkowa, reszta zwyklym kolorem."""
+    for czesc in re.split(r'(\s+)', tekst):
+        if not czesc:
+            continue
+        if czesc.lower() == 'folia':
+            d.text((x, y), czesc, font=font, fill=POMARANCZ)
+        elif re.fullmatch(r'pak\.?', czesc, re.I):
+            x += 3 * S                  # plakietka wystaje poza tekst — daj jej miejsce
+            rysuj_pak(d, x, y, czesc, font, S)
+            x += d.textlength(czesc, font=font) + 8 * S
+            continue
+        else:
+            d.text((x, y), czesc, font=font, fill=kolor_txt)
+        x += d.textlength(czesc, font=font)
+
+
 def karteczka_alu(folder, ile, licz, produkty, sciezka):
     """Mala karteczka PNG z podsumowaniem: produkty z iloscia i ile rozpoznano.
     Rysowana w 2x, zeby tekst byl ostry takze na ekranach Retina."""
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageDraw, ImageFilter
     S = 2
     W, pad = 560 * S, 30 * S
     f_tyt, f_mal = czcionka(21 * S, True), czcionka(13 * S)
@@ -1524,6 +1593,11 @@ def karteczka_alu(folder, ile, licz, produkty, sciezka):
     d.line([pad, y + 8 * S, W - pad, y + 8 * S], fill=(226, 232, 240), width=S)
     y += 26 * S
 
+    # Poswiata musi lezec pod tekstem, a nad tlem wiersza — dlatego najpierw tla i cala
+    # poswiata na osobnej warstwie (jedno rozmycie na wszystkie wiersze), potem napisy.
+    poswiata = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    dp = ImageDraw.Draw(poswiata)
+    wiersze = []
     for i, p in enumerate(lista):
         if i % 2 == 0:
             d.rounded_rectangle([pad - 10 * S, y - 5 * S, W - pad + 10 * S, y + wiersz - 7 * S],
@@ -1531,11 +1605,27 @@ def karteczka_alu(folder, ile, licz, produkty, sciezka):
         tekst = p['produkt'] + (f'  (niepewne {p["niepewne"]})' if p['niepewne'] else '')
         while d.textlength(tekst, font=f_prod) > W - 2 * pad - 70 * S and len(tekst) > 4:
             tekst = tekst[:-2].rstrip() + '…'
-        d.text((pad, y), tekst, font=f_prod, fill=TXT)
+        kolor = poswiata_wariantu(tekst)
+        if kolor:
+            # Obrys, zeby halo wychodzilo POZA litery — rozmycie same w sobie siada
+            # pod tekstem i nazwa robi sie nieczytelna.
+            dp.text((pad, y), samo_oznaczenie(tekst), font=f_prod, fill=kolor + (255,),
+                    stroke_width=S, stroke_fill=kolor + (255,))
+        wiersze.append((y, tekst, p))
+        y += wiersz
+
+    if poswiata.getbbox():
+        # Na jasnym tle kazdy srednio ciemny kolor czyta sie jak brud, a nie jak luna —
+        # halo musi zostac blade, bo i tak wystarczy do odroznienia /02 od /08.
+        poswiata = poswiata.filter(ImageFilter.GaussianBlur(4 * S))
+        poswiata.putalpha(poswiata.getchannel('A').point(lambda v: min(115, int(v * 2.2))))
+        im.paste(Image.alpha_composite(im.convert('RGBA'), poswiata).convert('RGB'), (0, 0))
+
+    for yw, tekst, p in wiersze:
+        rysuj_nazwe(d, pad, yw, tekst, f_prod, S, TXT)
         if p['ile'] != '':
             ilosc = f'× {p["ile"]}'
-            d.text((W - pad - d.textlength(ilosc, font=f_ile), y), ilosc, font=f_ile, fill=ACC)
-        y += wiersz
+            d.text((W - pad - d.textlength(ilosc, font=f_ile), yw), ilosc, font=f_ile, fill=ACC)
 
     y += 16 * S
     razem = sum(p['ile'] for p in produkty)
