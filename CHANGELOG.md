@@ -19,6 +19,17 @@ Nic w toku.
 
 ---
 
+## [1.4.1] — 2026-09-22
+
+### Zmienione
+
+- **Oznaczenia na karteczce prościej.** Zamiast rozmytej poświaty pod nazwą profilu jest
+  mleczny prostokąt z zaokrąglonymi rogami — błękitny dla `/02`, beżowy dla `/08`.
+  Dopisek `pak` dostał zwykłą szarą pigułkę zamiast faktury folii bąbelkowej.
+  Poświata na jasnym tle czytała się jak plama, a bąbelki robiły zbędny szum.
+
+---
+
 ## [1.4.0] — 2026-09-22
 
 ### Dodane
