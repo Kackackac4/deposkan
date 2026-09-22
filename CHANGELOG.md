@@ -15,6 +15,12 @@ GitHub Actions zbuduje wtedy `.app` i `.exe` i utworzy Release.
 
 ## [Niewydane]
 
+Nic w toku.
+
+---
+
+## [1.4.0] — 2026-09-22
+
 ### Dodane
 
 - **ALUPROF: oznaczenia na karteczce PNG.** Wariant profilu i dopiski widać teraz bez
